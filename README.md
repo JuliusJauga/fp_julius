@@ -10,6 +10,7 @@ Domain's BNF is provided in fp_julius/fp-2024-main/grammar.txt.
 
 ## Commands
 
-add
-remove
+- add
+
+- remove
 

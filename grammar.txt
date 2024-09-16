@@ -1,46 +1,57 @@
 <system> ::= <routes> | <command>
 
-<command> ::= <create_command> | <update_command> | <retrieve_command> | <delete_command> | compound_command
+<command> ::= <create_command> 
+            | <update_command> 
+            | <retrieve_command> 
+            | <delete_command> 
+            | <compound_command>
 
 <create_command> ::= "create_route" <route> 
                    | "create_bus" <bus> 
                    | "create_stop" <stop>
+                   | "create_sub_stop" <parent_stop_id> <sub_stop_id> <sub_stop_name> <time_list>
+                   | "create_sub_route" <parent_route_id> <sub_route_id> <sub_route_name> <bus_list>
 
-<update_command> ::= "update_route" <route_id> <route_name> <bus_list> 
+<update_command> ::= "update_route" <route_id> <route_name> <bus_list> <route_list>
                    | "update_bus" <bus_id> <bus_number> <departure_time_list> <stop_list> 
-                   | "update_stop" <stop_id> <stop_name> <time_list>
+                   | "update_stop" <stop_id> <stop_name> <time_list> <stop_list>
+                   | "update_sub_stop" <parent_stop_id> <sub_stop_id> <sub_stop_name> <time_list>
+                   | "update_sub_route" <parent_route_id> <sub_route_id> <sub_route_name> <bus_list>
 
 <retrieve_command> ::= "get_route" <route_id>
                      | "get_bus" <bus_id>
                      | "get_stop" <stop_id>
-                     | "get-routes-from-stop" <stop_id>
+                     | "get_routes_from_stop" <stop_id>
+                     | "get_sub_stops" <parent_stop_id>
+                     | "get_sub_routes" <parent_route_id>
 
 <delete_command> ::= "delete_route" <route_id>
                    | "delete_bus" <bus_id>
                    | "delete_stop" <stop_id>
-
+                   | "delete_sub_stop" <parent_stop_id> <sub_stop_id>
+                   | "delete_sub_route" <parent_route_id> <sub_route_id>
 
 <compound_command> ::= <command> ";" <command>
 
 <routes> ::= "routes" <route_list>
 
-<route_list> ::= <route> "," <route>
+<route_list> ::= <route> | <route> "," <route_list>
 
-<route> ::= "route_id" <route_id> "route_name" <route_name> "buses" <bus_list>
+<route> ::= "route_id" <route_id> "route_name" <route_name> "buses" <bus_list> "routes" <route_list>
 
-<bus_list> ::= <bus> "," <bus>
+<bus_list> ::= <bus> | <bus> "," <bus_list>
 
 <bus> ::= "bus_id" <bus_id> "bus_number" <bus_number> "departure_times" <departure_time_list> "stops" <stop_list>
 
-<departure_time_list> ::= <departure_time> "," <departure_time>
+<departure_time_list> ::= <departure_time> | <departure_time> "," <departure_time_list>
 
 <departure_time> ::= "start_time" <start_time> "end_time" <end_time>
 
-<stop_list> ::= <stop> "," <stop>
+<stop_list> ::= <stop> | <stop> "," <stop_list>
 
-<stop> ::= "stop_id" <stop_id> "stop_name" <stop_name> "bus_departure_times" <time_list>
+<stop> ::= "stop_id" <stop_id> "stop_name" <stop_name> "stops" <stop_list> "bus_departure_times" <time_list>
 
-<time_list> ::= <time> "," <time>
+<time_list> ::= <time> | <time> "," <time_list>
 
 <route_id> ::= <string>
 <route_name> ::= <string>
@@ -50,6 +61,16 @@
 <end_time> ::= <string>
 <stop_id> ::= <string>
 <stop_name> ::= <string>
+<sub_stop_id> ::= <string>     
+<sub_stop_name> ::= <string>       
+<parent_route_id> ::= <string>     
+<parent_stop_id> ::= <string>     
+<sub_route_id> ::= <string>       
+<sub_route_name> ::= <string>     
 <time> ::= <string>
+
 <string> ::= <char> | <char> <string>
-<char> ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+<char> ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+          | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+          | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"

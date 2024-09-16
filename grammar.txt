@@ -1,6 +1,6 @@
 <system> ::= <routes> | <command>
 
-<command> ::= <create_command> | <update_command> | <retrieve_command> | <delete_command>
+<command> ::= <create_command> | <update_command> | <retrieve_command> | <delete_command> | compound_command
 
 <create_command> ::= "create_route" <route> 
                    | "create_bus" <bus> 

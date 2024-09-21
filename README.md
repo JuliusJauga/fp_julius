@@ -59,7 +59,7 @@ Recursion is in routes being made of other routes, each having their stops with 
 
 See fp_julius/grammar.txt
 
-### Basic structure
+### Basic structure / Example
 
 ```
 routes 

@@ -17,41 +17,18 @@ BNF tested on https://bnfplayground.pauliankline.com/
 
 ## Commands
 
-- **create_route**: Adds a new route to the system.
-    - Parameters: `route_id`, `route_name`
+- **`list-create`** - Creates an empty route list.
+- **`list-add <list> <route>`** - Add a route to a list.
+- **`list-get <list> <name>`** - Get a route from a list.
+- **`list-remove <list> <name>`** - Remove a route from a list.
 
-- **create_stop**: Adds a new stop to a bus route.
-    - Parameters: `stop_id`, `stop_name`
+- **`route-create <name>`** - Creates a route with the provided name.
+- **`route-get <route> <name>`** - Get a stop from a route.
+- **`route-add-route <parent_route> <child_route>`** - Add a route to another route.
+- **`route-remove <route> <stop_name>`** - Remove a stop from a route.
 
-- **create_sub_route**: Adds a subroute to an existing route
-    - Parameters: `parent_route_id`, `sub_route_id`, `sub_route_name`
-
-- **update_route**: Updates an existing route.
-    - Parameters: `route_id`, `route_name`, `route_list`, `stops`
-
-- **update_stop**: Updates an existing stop.
-    - Parameters: `stop_id`, `stop_name`
-
-- **update_sub_route**: Updates an existing sub-route.
-    - Parameters: `parent_route_id`, `route_id`, `route_name`, `route_list`, `stops`
-
-- **get_route**: Retrieves information about a route.
-    - Parameters: `route_id`
-
-- **get_sub_routes**: Retrieves a list of routes, that make a bigger route.
-    - Parameters: `parent_route_id`
-
-- **delete_route**: Deletes a route from the system.
-    - Parameters: `route_id`
-
-- **delete_stop**: Deletes a stop from a route.
-    - Parameters: `stop_id`
-
-- **delete_sub_route**: Deletes a sub-route from the system.
-    - Parameters: `parent_route_id`, `sub_route_id`
-
-- **get_routes_from_stop**: Retrieves routes that have a specific stop.
-    - Parameters: `stop_id`
+- **`stop-create <name>`** - Creates a stop with the provided name.
+- **`stop-delete <name>`** - Deletes a stop with that name.
 
 ### Recursion
 
@@ -59,17 +36,28 @@ Recursion is in routes being made of other routes, each having their stops with 
 
 See fp_julius/grammar.txt
 
-### Basic structure / Example
+### BNF Example
+
+```
+[
+<Route1{(stop1)(stop2)(stop3)
+    <InternalRoute1{(stop1)}>}>
+<Route2{(stop4)(stop5)(stop6)
+    <InternalRoute2{(stop4)(stop5)
+        <InternalRoute22{(stop4)}>}>}>
+]
+```
+
+In this example the system/route list is made out of 2 main routes, each having internal routes, also second internal route also has a internal route. 
+
+### Basic structure
 
 ```
 routes 
-    route_id
     route_name
     routes
-        route_id
         route_name
         routes
-            route_id
             route_name
             routes
                 ...
@@ -80,40 +68,7 @@ routes
             ...
         ...
     stops 
-        stop_id
         stop_name
     ...
 ```
 A route can be made of other smaller routes, each having their own stops.
-
-# Example
-
-```
-<route_id 2F route_name route1 routes 
-    <
-    route_id 2D route_name route2 routes 
-    <
-        route_id 2C route_name route3 routes stops 
-        <
-            stop_id 1 stop_name Pirmoji
-        > 
-        route_id 2B route_name route4 routes stops 
-        <
-            stop_id 2 stop_name Antroji
-        >
-    >
-    stops
-    <
-    stop_id 1 stop_name Pirmoji
-    stop_id 2 stop_name Antroji
-    stop_id 3 stop_name Trecioji
-    > 
-    stops
-    <
-    stop_id 1 stop_name Pirmoji
-    stop_id 2 stop_name Antroji
-    stop_id 3 stop_name Trecioji
-    stop_id 4 stop_name Ketvirtoji
-    >
->
-```

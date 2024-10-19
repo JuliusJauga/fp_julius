@@ -18,14 +18,14 @@ BNF tested on https://bnfplayground.pauliankline.com/
 ## Commands
 
 - **`list-create`** - Creates an empty route list.
-- **`list-add <list> <route>`** - Add a route to a list.
-- **`list-get <list> <name>`** - Get a route from a list.
-- **`list-remove <list> <name>`** - Remove a route from a list.
+- **`list-add <name> <route>`** - Add a route to a list.
+- **`list-get <name>`** - Get a list.
+- **`list-remove <name> <route>`** - Remove a route from a list.
 
 - **`route-create <name>`** - Creates a route with the provided name.
-- **`route-get <route> <name>`** - Get a stop from a route.
+- **`route-get <name>`** - Get a stop from a route.
 - **`route-add-route <parent_route> <child_route>`** - Add a route to another route.
-- **`route-remove <route> <stop_name>`** - Remove a stop from a route.
+- **`route-remove <name>`** - Removes a route.
 
 - **`stop-create <name>`** - Creates a stop with the provided name.
 - **`stop-delete <name>`** - Deletes a stop with that name.

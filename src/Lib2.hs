@@ -33,15 +33,103 @@ module Lib2 (
 
     import Data.Char (isAlphaNum, isDigit, isLetter)
     import Data.List (isPrefixOf, partition)
-
+    
+    -- Define the Name data type
     data Name = NumberName Int | WordName String | StringName String
         deriving (Show, Eq)
 
+    -- Define the custom word type.
     newtype CustomWord = CustomWord String
         deriving (Show, Eq)
         
+    -- Define the parser type
     type Parser a = String -> Either String (a, String)
 
+    -- Define and
+    and7' :: (a -> b -> c -> d -> e -> f -> g -> h) 
+      -> Parser a 
+      -> Parser b 
+      -> Parser c 
+      -> Parser d 
+      -> Parser e 
+      -> Parser f 
+      -> Parser g 
+      -> Parser h
+    and7' g a b c d e f g' input =
+        case a input of
+            Right (v1, r1) -> 
+                case b r1 of
+                    Right (v2, r2) -> 
+                        case c r2 of
+                            Right (v3, r3) -> 
+                                case d r3 of
+                                    Right (v4, r4) -> 
+                                        case e r4 of
+                                            Right (v5, r5) -> 
+                                                case f r5 of
+                                                    Right (v6, r6) -> 
+                                                        case g' r6 of
+                                                            Right (v7, r7) -> Right (g v1 v2 v3 v4 v5 v6 v7, r7)
+                                                            Left e7 -> Left e7
+                                                    Left e6 -> Left e6
+                                            Left e5 -> Left e5
+                                    Left e4 -> Left e4
+                            Left e3 -> Left e3
+                    Left e2 -> Left e2
+            Left e1 -> Left e1
+    
+    and6' :: (a -> b -> c -> d -> e -> f -> g) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f -> Parser g
+    and6' g a b c d e f input =
+        case a input of
+            Right (v1, r1) ->
+                case b r1 of
+                    Right (v2, r2) ->
+                        case c r2 of
+                            Right (v3, r3) ->
+                                case d r3 of
+                                    Right (v4, r4) ->
+                                        case e r4 of
+                                            Right (v5, r5) ->
+                                                case f r5 of
+                                                    Right (v6, r6) -> Right (g v1 v2 v3 v4 v5 v6, r6)
+                                                    Left e6 -> Left e6
+                                            Left e5 -> Left e5
+                                    Left e4 -> Left e4
+                            Left e3 -> Left e3
+                    Left e2 -> Left e2
+            Left e1 -> Left e1
+
+    and5' :: (a -> b -> c -> d -> e -> f) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f
+    and5' f a b c d e input =
+        case a input of
+            Right (v1, r1) ->
+                case b r1 of
+                    Right (v2, r2) ->
+                        case c r2 of
+                            Right (v3, r3) ->
+                                case d r3 of
+                                    Right (v4, r4) ->
+                                        case e r4 of
+                                            Right (v5, r5) -> Right (f v1 v2 v3 v4 v5, r5)
+                                            Left e5 -> Left e5
+                                    Left e4 -> Left e4
+                            Left e3 -> Left e3
+                    Left e2 -> Left e2
+            Left e1 -> Left e1
+    and4' :: (a -> b -> c -> d -> e) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e
+    and4' f a b c d input =
+        case a input of
+            Right (v1, r1) ->
+                case b r1 of
+                    Right (v2, r2) ->
+                        case c r2 of
+                            Right (v3, r3) ->
+                                case d r3 of
+                                    Right (v4, r4) -> Right (f v1 v2 v3 v4, r4)
+                                    Left e4 -> Left e4
+                            Left e3 -> Left e3
+                    Left e2 -> Left e2
+            Left e1 -> Left e1
     and3' :: (a -> b -> c -> d) -> Parser a -> Parser b -> Parser c -> Parser d
     and3' f a b c input =
         case a input of
@@ -53,8 +141,15 @@ module Lib2 (
                             Left e3 -> Left e3
                     Left e2 -> Left e2
             Left e1 -> Left e1
-
-            
+    and2' :: (a -> b -> c) -> Parser a -> Parser b -> Parser c
+    and2' f a b input =
+        case a input of
+            Right (v1, r1) ->
+                case b r1 of
+                    Right (v2, r2) -> Right (f v1 v2, r2)
+                    Left e2 -> Left e2
+            Left e1 -> Left e1
+    
     or2 :: Parser a -> Parser a -> Parser a
     or2 a b input =
         case a input of
@@ -113,33 +208,15 @@ module Lib2 (
     name = parseWordName `or2` parseNumberName `or2` parseStringName
 
     -- Parsing components
-
-    -- Helper to aggregate error messages with a focus on route parsing
-    orElse :: (String -> Either String a) -> (String -> Either String a) -> String -> Either String a
-    orElse p1 p2 input = case p1 input of
-        Right result -> Right result
-        Left err1 -> case p2 input of
-            Right result -> Right result
-            Left err2
-                -- Check if both errors are about invalid route format
-                | err1 == "Invalid route format." && err2 == "Invalid route format." ->
-                    Left "Invalid route format. Expected a valid route definition."
-                -- Avoid repeating the combined error message
-                | "Invalid route format. Expected a valid route definition." `isPrefixOf` err1 -> Left err1
-                | "Invalid route format. Expected a valid route definition." `isPrefixOf` err2 -> Left err2
-                | otherwise -> Left (err1 ++ "; " ++ err2)
-
-
-
     -- Helper function to parse many elements using another parser
-    -- type Parser a = String -> Either String (a, String)
     parseMany :: Parser a -> Parser [a]
-    parseMany parser input = case parser input of
-        Right (x, rest) ->
-            case parseMany parser rest of
-                Right (xs, rest') -> Right (x:xs, rest')
-                Left _ -> Right ([x], rest)
-        Left _ -> Right ([], input)
+    parseMany parser input = 
+        case parser input of
+            Right (x, rest) -> 
+                case parseMany parser rest of
+                    Right (xs, rest') -> Right (x:xs, rest')
+                    Left _ -> Right ([x], rest)
+            Left _ -> Right ([], input) 
 
     -- Parse a single character
     -- <char> ::= "a" | "b" | "c" ...
@@ -149,28 +226,10 @@ module Lib2 (
         | otherwise = Left $ "Expected '" ++ [c] ++ "'"
     char _ [] = Left "Unexpected end of input"
 
-    -- Parse a name
-    -- <name> ::= <char>+ | <name> " " <name>
-    -- name :: String -> Either String (String, String)
-    -- name input =
-    --     let (n, rest) = span (\c -> isAlphaNum c || c == ' ') input
-    --         trimmedName = reverse (dropWhile isSpace (reverse (dropWhile isSpace n)))
-    --     in if null trimmedName then Left "Expected a name, but found none"
-    --     else Right (trimmedName, rest)
-
     -- Parse a stop
     -- <stop> ::= "(" <stop_id> ")"
     parseStop :: Parser Stop
-    parseStop input =
-        case char '(' input of
-            Right (_, rest1) ->
-                case name rest1 of
-                    Right (stopId'', rest2) ->
-                        case char ')' rest2 of
-                            Right (_, rest3) -> Right (Stop stopId'', rest3)
-                            Left _ -> Left "Expected ')' at the end of stop."
-                    Left _ -> Left "Expected a valid stop ID."
-            Left _ -> Left "Expected '(' at the start of stop."
+    parseStop = and3' (\_ stopId _ -> Stop stopId) (char '(') name (char ')')
 
     -- Parse a list of stops
     -- <stop_list> ::= <stop>*
@@ -180,51 +239,22 @@ module Lib2 (
     -- Parse a route
     -- <route> ::= "<" <route_id> "{" <stop_list> <nested_route_list> "}" ">"
     parseRoute :: Parser Route
-    parseRoute input =
-        case char '<' input of
-            Right (_, rest1) ->
-                case name rest1 of
-                    Right (routeId'', rest2) ->
-                        case char '{' rest2 of
-                            Right (_, rest3) ->
-                                case parseStopList rest3 of
-                                    Right (stops'', rest4) ->
-                                        case parseRouteList rest4 of
-                                            Right (nestedRoutes, rest5) ->
-                                                case char '}' rest5 of
-                                                    Right (_, rest6) ->
-                                                        case char '>' rest6 of
-                                                            Right (_, rest7) -> Right (Route routeId'' stops'' nestedRoutes, rest7)
-                                                            Left _ -> Right (Route routeId'' stops'' nestedRoutes, rest6)
-                                                    Left _ -> Left "Expected '}' at the end of stops and nested routes."
-                                            Left _ -> Left "Failed to parse nested routes."
-                                    Left _ -> Left "Failed to parse stops."
-                            Left _ -> Left "Expected '{' at the start of stops and nested routes."
-                    Left _ -> Left "Expected a valid route ID."
-            Left _ -> Left "Expected '<' at the start of route."
-
+    parseRoute = and7' makeRoute (char '<') name (char '{') parseStopList parseRouteList (char '}') (char '>')
+        where makeRoute _ routeId _ stops'' nestedRoutes _ _ = Route routeId stops'' nestedRoutes
 
     -- Parse a list of routes
     -- <nested_route_list> ::= <route>*
     parseRouteList :: Parser [Route]
-    parseRouteList input =
-            case parseMany parseRoute input of
-                Right (routes'', rest1) -> Right (routes'', rest1)
-                Left _ -> Left "Failed to parse route list."
+    parseRouteList input = 
+        case parseMany parseRoute input of
+            Right (routes', rest) -> Right (routes', rest)
+            Left _ -> Right ([], input)
+
 
     -- Parse a route system
     -- <route_list_internal> ::= <route>*
     parseRouteSystem :: Parser [Route]
-    parseRouteSystem input =
-        case char '[' input of
-            Right (_, rest1) ->
-                case parseMany parseRoute rest1 of
-                    Right (routes'', rest2) ->
-                        case char ']' rest2 of
-                            Right (_, rest3) -> Right (routes'', rest3)
-                            Left _ -> Left "Failed to parse route system."
-                    Left _ -> Left "Failed to parse route list."
-            Left _ -> Left "Expected '[' at the start of route system."
+    parseRouteSystem = and3' (\_ routes' _ -> routes') (char '[') (parseMany parseRoute) (char ']')
 
     -- Helper function to parse a string. Just to parse querys
     string :: String -> Parser String
@@ -232,166 +262,70 @@ module Lib2 (
         | str `isPrefixOf` input = Right (str, drop (length str) input)
         | otherwise = Left $ "Expected '" ++ str ++ "'"
 
-
-
-    -- Parsing functions
-
     -- Parse a list-create query
     -- <list_create> ::= "list-create " <name>
     parseListCreate :: Parser Query
-    parseListCreate input =
-        case string "list-create " input of
-            Right (_, rest) ->
-                case name rest of
-                    Right (listName, rest') -> Right (ListCreate listName, rest')
-                    Left _ -> Left "Expected a valid list name."
-            Left _ -> Left "Expected 'list-create'."
+    parseListCreate = and2' (\_ listName -> ListCreate listName) (string "list-create ") name
 
     -- Parse a list-add query
     -- <list_add> ::= "list-add " <name> <route>
     parseListAdd :: Parser Query
-    parseListAdd input =
-        case string "list-add " input of
-            Right (_, rest) ->
-                case name rest of
-                    Right (listName, rest1) ->
-                        case char ' ' rest1 of
-                            Right (_, rest2) ->
-                                case parseRoute rest2 of
-                                    Right (route, rest3) -> Right (ListAdd listName route, rest3)
-                                    Left _ -> Left "Expected a valid route."
-                            Left _ -> Left "Expected whitespace after list name."
-                    Left _ -> Left "Expected a valid list name."
-            Left _ -> Left "Expected 'list-add'."
+    parseListAdd = and4' (\_ listName _ route -> ListAdd listName route) (string "list-add ") name (char ' ') parseRoute
 
     -- Parse a list-get query
     -- <list_get> ::= "list-get " <name>
     parseListGet :: Parser Query
-    parseListGet input =
-        case string "list-get " input of
-            Right (_, rest) ->
-                case name rest of
-                    Right (listName, rest') -> Right (ListGet listName, rest')
-                    Left _ -> Left "Expected a valid list name."
-            Left _ -> Left "Expected 'list-get'."
-    
+    parseListGet = and2' (\_ listName -> ListGet listName) (string "list-get ") name
+
     -- Parse a list-remove query
     -- <list_remove> ::= "list-remove " <name>
     parseListRemove :: Parser Query
-    parseListRemove input =
-        case string "list-remove " input of
-            Right (_, rest) ->
-                case name rest of
-                    Right (listName, rest') -> Right (ListRemove listName, rest')
-                    Left _ -> Left "Expected a valid list name."
-            Left _ -> Left "Expected 'list-remove'."
+    parseListRemove = and2' (\_ listName -> ListRemove listName) (string "list-remove ") name
 
     -- Parse a list-remove query
     -- <list_remove> ::= "list-remove " <name>
     parseRouteCreate :: Parser Query
-    parseRouteCreate input =
-        case string "route-create " input of
-            Right (_, rest) ->
-                case name rest of
-                    Right (routeId, rest') -> Right (RouteCreate routeId, rest')
-                    Left _ -> Left "Expected a valid route ID."
-            Left _ -> Left "Expected 'route-create'."
-
+    parseRouteCreate = and2' (\_ routeId -> RouteCreate routeId) (string "route-create ") name
+    
     -- Parse a route-get query
     -- <route_get> ::= "route-get " <name>
     parseRouteGet :: Parser Query
-    parseRouteGet input =
-        case string "route-get " input of
-            Right (_, rest) ->
-                case name rest of
-                    Right (routeId, rest') -> Right (RouteGet routeId, rest')
-                    Left _ -> Left "Expected a valid route ID."
-            Left _ -> Left "Expected 'route-get'."
-
+    parseRouteGet = and2' (\_ routeId -> RouteGet routeId) (string "route-get ") name
+    
     -- Parse a route-add-route query
     -- <route_add_route> ::= "route-add-route " <route> <route>
     parseRouteAddRoute :: Parser Query
-    parseRouteAddRoute input =
-        case string "route-add-route " input of
-            Right (_, rest) ->
-                case parseRoute rest of
-                    Right (parentRoute, rest1) ->
-                        case string " " rest1 of
-                            Right (_, rest2) ->
-                                case parseRoute rest2 of
-                                    Right (childRoute, rest3) -> Right (RouteAddRoute parentRoute childRoute, rest3)
-                                    Left _ -> Left "Expected a valid child route."
-                            Left _ -> Left "Expected a space between parent and child routes."
-                    Left _ -> Left "Expected a valid parent route."
-            Left _ -> Left "Expected 'route-add-route'."
-
+    parseRouteAddRoute = and4' 
+        (\_ parentRoute _ childRoute -> RouteAddRoute parentRoute childRoute) 
+        (string "route-add-route ") 
+        parseRoute
+        (char ' ')
+        parseRoute
     -- Parse a route-remove query
     -- <route_remove> ::= "route-remove " <name>
     parseRouteRemove :: Parser Query
-    parseRouteRemove input =
-        case string "route-remove " input of
-            Right (_, rest) ->
-                case name rest of
-                    Right (routeId, rest') -> Right (RouteRemove routeId, rest')
-                    Left _ -> Left "Expected a valid route ID."
-            Left _ -> Left "Expected 'route-remove'."
-
+    parseRouteRemove = and2' (\_ routeId -> RouteRemove routeId) (string "route-remove ") name
+    
     -- Parse a stop-create query
     -- <stop_create> ::= "stop-create " <name>
     parseStopCreate :: Parser Query
-    parseStopCreate input =
-        case string "stop-create " input of
-            Right (_, rest) ->
-                case name rest of
-                    Right (stopId, rest') -> Right (StopCreate stopId, rest')
-                    Left _ -> Left "Expected a valid stop ID."
-            Left _ -> Left "Expected 'stop-create'."
+    parseStopCreate = and2' (\_ stopId -> StopCreate stopId) (string "stop-create ") name
 
     -- Parse a stop-delete query
     -- <stop_delete> ::= "stop-delete " <name>
     parseStopDelete :: Parser Query
-    parseStopDelete input =
-        case string "stop-delete " input of
-            Right (_, rest) ->
-                case name rest of
-                    Right (stopId, rest') -> Right (StopDelete stopId, rest')
-                    Left _ -> Left "Expected a valid stop ID."
-            Left _ -> Left "Expected 'stop-delete'."
+    parseStopDelete = and2' (\_ stopId -> StopDelete stopId) (string "stop-delete ") name
 
     -- Parse a route-remove query
     -- <route_remove_stop> :: "route-remove-stop " <name> <stop>
     parseRouteRemoveStop :: Parser Query
-    parseRouteRemoveStop input = 
-        case string "route-remove-stop " input of
-            Right (_, rest) ->
-                case name rest of
-                    Right (routeId, rest1) ->
-                        case char ' ' rest1 of
-                            Right (_, rest2) ->
-                                case parseStop rest2 of
-                                    Right (stop, rest3) -> Right (RouteRemoveStop routeId stop, rest3)
-                                    Left _ -> Left "Expected a valid stop."
-                            Left _ -> Left "Expected whitespace after route ID."
-                    Left _ -> Left "Expected a valid route ID."
-            Left _ -> Left "Expected 'route-remove-stop'."
+    parseRouteRemoveStop = and4' (\_ routeId _ stop -> RouteRemoveStop routeId stop) (string "route-remove-stop ") name (char ' ') parseStop
 
     -- Parse a route-add query
     -- <route_add_stop> :: "route-add-stop " <name> <stop>
     parseRouteAddStop :: Parser Query
-    parseRouteAddStop input =
-        case string "route-add-stop " input of
-            Right (_, rest) ->
-                case name rest of
-                    Right (routeId, rest1) ->
-                        case char ' ' rest1 of
-                            Right (_, rest2) ->
-                                case parseStop rest2 of
-                                    Right (stop, rest3) -> Right (RouteAddStop routeId stop, rest3)
-                                    Left _ -> Left "Expected a valid stop."
-                            Left _ -> Left "Expected whitespace after route ID."
-                    Left _ -> Left "Expected a valid route ID."
-            Left _ -> Left "Expected 'route-add-stop'."
-
+    parseRouteAddStop = and4' (\_ routeId _ stop -> RouteAddStop routeId stop) (string "route-add-stop ") name (char ' ') parseStop
+    
     -- Main query parser
     parseQuery :: Parser Query
     parseQuery = 

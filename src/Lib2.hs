@@ -132,7 +132,8 @@ module Lib2 (
 
 
     -- Helper function to parse many elements using another parser
-    parseMany :: (String -> Either String (a, String)) -> String -> Either String ([a], String)
+    -- type Parser a = String -> Either String (a, String)
+    parseMany :: Parser a -> Parser [a]
     parseMany parser input = case parser input of
         Right (x, rest) ->
             case parseMany parser rest of
@@ -142,7 +143,7 @@ module Lib2 (
 
     -- Parse a single character
     -- <char> ::= "a" | "b" | "c" ...
-    char :: Char -> String -> Either String (Char, String)
+    char :: Char -> Parser Char
     char c (x:xs)
         | c == x = Right (c, xs)
         | otherwise = Left $ "Expected '" ++ [c] ++ "'"
@@ -159,7 +160,7 @@ module Lib2 (
 
     -- Parse a stop
     -- <stop> ::= "(" <stop_id> ")"
-    parseStop :: String -> Either String (Stop, String)
+    parseStop :: Parser Stop
     parseStop input =
         case char '(' input of
             Right (_, rest1) ->
@@ -173,12 +174,12 @@ module Lib2 (
 
     -- Parse a list of stops
     -- <stop_list> ::= <stop>*
-    parseStopList :: String -> Either String ([Stop], String)
+    parseStopList :: Parser [Stop]
     parseStopList = parseMany parseStop
 
     -- Parse a route
     -- <route> ::= "<" <route_id> "{" <stop_list> <nested_route_list> "}" ">"
-    parseRoute :: String -> Either String (Route, String)
+    parseRoute :: Parser Route
     parseRoute input =
         case char '<' input of
             Right (_, rest1) ->
@@ -205,7 +206,7 @@ module Lib2 (
 
     -- Parse a list of routes
     -- <nested_route_list> ::= <route>*
-    parseRouteList :: String -> Either String ([Route], String)
+    parseRouteList :: Parser [Route]
     parseRouteList input =
             case parseMany parseRoute input of
                 Right (routes'', rest1) -> Right (routes'', rest1)
@@ -213,7 +214,7 @@ module Lib2 (
 
     -- Parse a route system
     -- <route_list_internal> ::= <route>*
-    parseRouteSystem :: String -> Either String ([Route], String)
+    parseRouteSystem :: Parser [Route]
     parseRouteSystem input =
         case char '[' input of
             Right (_, rest1) ->
@@ -226,7 +227,7 @@ module Lib2 (
             Left _ -> Left "Expected '[' at the start of route system."
 
     -- Helper function to parse a string. Just to parse querys
-    string :: String -> String -> Either String (String, String)
+    string :: String -> Parser String
     string str input
         | str `isPrefixOf` input = Right (str, drop (length str) input)
         | otherwise = Left $ "Expected '" ++ str ++ "'"
@@ -237,7 +238,7 @@ module Lib2 (
 
     -- Parse a list-create query
     -- <list_create> ::= "list-create " <name>
-    parseListCreate :: String -> Either String (Query, String)
+    parseListCreate :: Parser Query
     parseListCreate input =
         case string "list-create " input of
             Right (_, rest) ->
@@ -248,7 +249,7 @@ module Lib2 (
 
     -- Parse a list-add query
     -- <list_add> ::= "list-add " <name> <route>
-    parseListAdd :: String -> Either String (Query, String)
+    parseListAdd :: Parser Query
     parseListAdd input =
         case string "list-add " input of
             Right (_, rest) ->
@@ -265,7 +266,7 @@ module Lib2 (
 
     -- Parse a list-get query
     -- <list_get> ::= "list-get " <name>
-    parseListGet :: String -> Either String (Query, String)
+    parseListGet :: Parser Query
     parseListGet input =
         case string "list-get " input of
             Right (_, rest) ->
@@ -276,7 +277,7 @@ module Lib2 (
     
     -- Parse a list-remove query
     -- <list_remove> ::= "list-remove " <name>
-    parseListRemove :: String -> Either String (Query, String)
+    parseListRemove :: Parser Query
     parseListRemove input =
         case string "list-remove " input of
             Right (_, rest) ->
@@ -287,7 +288,7 @@ module Lib2 (
 
     -- Parse a list-remove query
     -- <list_remove> ::= "list-remove " <name>
-    parseRouteCreate :: String -> Either String (Query, String)
+    parseRouteCreate :: Parser Query
     parseRouteCreate input =
         case string "route-create " input of
             Right (_, rest) ->
@@ -298,7 +299,7 @@ module Lib2 (
 
     -- Parse a route-get query
     -- <route_get> ::= "route-get " <name>
-    parseRouteGet :: String -> Either String (Query, String)
+    parseRouteGet :: Parser Query
     parseRouteGet input =
         case string "route-get " input of
             Right (_, rest) ->
@@ -309,7 +310,7 @@ module Lib2 (
 
     -- Parse a route-add-route query
     -- <route_add_route> ::= "route-add-route " <route> <route>
-    parseRouteAddRoute :: String -> Either String (Query, String)
+    parseRouteAddRoute :: Parser Query
     parseRouteAddRoute input =
         case string "route-add-route " input of
             Right (_, rest) ->
@@ -326,7 +327,7 @@ module Lib2 (
 
     -- Parse a route-remove query
     -- <route_remove> ::= "route-remove " <name>
-    parseRouteRemove :: String -> Either String (Query, String)
+    parseRouteRemove :: Parser Query
     parseRouteRemove input =
         case string "route-remove " input of
             Right (_, rest) ->
@@ -337,7 +338,7 @@ module Lib2 (
 
     -- Parse a stop-create query
     -- <stop_create> ::= "stop-create " <name>
-    parseStopCreate :: String -> Either String (Query, String)
+    parseStopCreate :: Parser Query
     parseStopCreate input =
         case string "stop-create " input of
             Right (_, rest) ->
@@ -348,7 +349,7 @@ module Lib2 (
 
     -- Parse a stop-delete query
     -- <stop_delete> ::= "stop-delete " <name>
-    parseStopDelete :: String -> Either String (Query, String)
+    parseStopDelete :: Parser Query
     parseStopDelete input =
         case string "stop-delete " input of
             Right (_, rest) ->
@@ -357,39 +358,46 @@ module Lib2 (
                     Left _ -> Left "Expected a valid stop ID."
             Left _ -> Left "Expected 'stop-delete'."
 
+    -- Parse a route-remove query
+    -- <route_remove_stop> :: "route-remove-stop " <name> <stop>
+    parseRouteRemoveStop :: Parser Query
+    parseRouteRemoveStop input = 
+        case string "route-remove-stop " input of
+            Right (_, rest) ->
+                case name rest of
+                    Right (routeId, rest1) ->
+                        case char ' ' rest1 of
+                            Right (_, rest2) ->
+                                case parseStop rest2 of
+                                    Right (stop, rest3) -> Right (RouteRemoveStop routeId stop, rest3)
+                                    Left _ -> Left "Expected a valid stop."
+                            Left _ -> Left "Expected whitespace after route ID."
+                    Left _ -> Left "Expected a valid route ID."
+            Left _ -> Left "Expected 'route-remove-stop'."
+
+    -- Parse a route-add query
+    -- <route_add_stop> :: "route-add-stop " <name> <stop>
+    parseRouteAddStop :: Parser Query
+    parseRouteAddStop input =
+        case string "route-add-stop " input of
+            Right (_, rest) ->
+                case name rest of
+                    Right (routeId, rest1) ->
+                        case char ' ' rest1 of
+                            Right (_, rest2) ->
+                                case parseStop rest2 of
+                                    Right (stop, rest3) -> Right (RouteAddStop routeId stop, rest3)
+                                    Left _ -> Left "Expected a valid stop."
+                            Left _ -> Left "Expected whitespace after route ID."
+                    Left _ -> Left "Expected a valid route ID."
+            Left _ -> Left "Expected 'route-add-stop'."
+
     -- Main query parser
-    parseQuery :: String -> Either String Query
-    parseQuery input =
-        case parseListCreate input of
-            Right (query, _) -> Right query
-            Left _ ->
-                case parseListAdd input of
-                    Right (query, _) -> Right query
-                    Left _ ->
-                        case parseListGet input of
-                            Right (query, _) -> Right query
-                            Left _ ->
-                                case parseListRemove input of
-                                    Right (query, _) -> Right query
-                                    Left _ ->
-                                        case parseRouteCreate input of
-                                            Right (query, _) -> Right query
-                                            Left _ ->
-                                                case parseRouteGet input of
-                                                    Right (query, _) -> Right query
-                                                    Left _ ->
-                                                        case parseRouteAddRoute input of
-                                                            Right (query, _) -> Right query
-                                                            Left _ ->
-                                                                case parseRouteRemove input of
-                                                                    Right (query, _) -> Right query
-                                                                    Left _ ->
-                                                                        case parseStopCreate input of
-                                                                            Right (query, _) -> Right query
-                                                                            Left _ ->
-                                                                                case parseStopDelete input of
-                                                                                    Right (query, _) -> Right query
-                                                                                    Left _ -> Left "Invalid query."
+    parseQuery :: Parser Query
+    parseQuery = 
+        parseListAdd `or2` parseListCreate `or2` parseListGet `or2` parseListRemove `or2`
+        parseRouteCreate `or2` parseRouteGet `or2` parseRouteAddRoute `or2` parseRouteRemove `or2`
+        parseRouteAddStop `or2` parseRouteRemoveStop `or2` parseStopCreate `or2` parseStopDelete
 
     -- Query definition.
     data Query

@@ -34,9 +34,20 @@ A NodeRoute type has two constructors, a nodeRouteId (Which is the name of the r
 
 When rebuilding a Route back from a tree, the topmost RouteTree and all of its children nodes will get recursively added to nestedRoutes of Route type.
 
+#### Unit tests.
+
+Added unit testing for each element of parsing. Components and commands.
+Also added unit testing for state transitions.
+Higher recursion unit tests are provided in the bottom of fp_julius/test/Spec.hs file. These tests include inserting higher nested Routes, each having their own stops and so on.
+
 #### Details
 Added parsing and state transition control for the BNF that is provided in fp_julius/grammar.txt.
 Changes that were made to the BNF are documented on fp_julius/ChangesMadeToGrammar.txt
+
+#### State transition usage in GHCI
+
+Commands and expected output are provided in fp_julius/stateTransitionWalkthrough.hs
+
 
 ## BNF
 The grammar for this domain is provided in fp_julius/grammar.txt.

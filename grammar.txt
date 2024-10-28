@@ -1,15 +1,15 @@
-<list_create> ::= "list-create" <name>
-<list_add> ::= "list-add" <name> <route>
-<list_get> ::= "list-get" <name>
-<list_remove> ::= "list-remove" <name> <route>
+<list_create> ::= "list-create " <name>
+<list_add> ::= "list-add " <name> <route>
+<list_get> ::= "list-get " <name>
+<list_remove> ::= "list-remove " <name>
 
-<route_create> ::= "route-create" <name>
-<route_get> ::= "route-get" <name>
-<route_add_route> ::= "route-add-route" <route> " " <route>
-<route_remove> ::= "route-remove" <name>
+<route_create> ::= "route-create " <name>
+<route_get> ::= "route-get " <name>
+<route_add_route> ::= "route-add-route " <route> " " <route>
+<route_remove> ::= "route-remove " <name>
 
-<stop_create> ::= "stop-create" <name>
-<stop_delete> ::= "stop-delete" <name>
+<stop_create> ::= "stop-create " <name>
+<stop_delete> ::= "stop-delete " <name>
 
 <route_list> ::= "[" <route_list_internal> "]"
 <route_list_internal> ::= <route>*

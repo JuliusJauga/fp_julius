@@ -15,35 +15,36 @@ import Lib2 (
 printState :: State -> IO ()
 printState (State routeTreeLists' routes' stops'') = do
     putStrLn "Route Tree Lists:"
-    mapM_ printRouteTreeList routeTreeLists'
+    mapM_ (printRouteTreeList 0) routeTreeLists'
     putStrLn "Routes:"
-    mapM_ printRoute routes'
+    mapM_ (printRoute 0) routes'
     putStrLn "Stops:"
     mapM_ printStop stops''
     putStrLn ""
 
-printRouteTreeList :: (String, [RouteTree]) -> IO ()
-printRouteTreeList (name, trees) = do
-    putStrLn $ "  List Name: " ++ name
-    mapM_ printRouteTree trees
+printRouteTreeList :: Int -> (String, [RouteTree]) -> IO ()
+printRouteTreeList indentLevel (name, trees) = do
+    putStrLn $ replicate indentLevel ' ' ++ "List Name: " ++ name
+    mapM_ (printRouteTree (indentLevel + 2)) trees
 
-printRouteTree :: RouteTree -> IO ()
-printRouteTree EmptyTree = putStrLn "    Empty Tree"
-printRouteTree (Node (NodeRoute routeId stops'') children) = do
-    putStrLn $ "    Route ID: " ++ routeId
-    putStrLn $ "    Stops: " ++ show stops''
-    putStrLn "    Children:"
-    mapM_ printRouteTree children
+printRouteTree :: Int -> RouteTree -> IO ()
+printRouteTree indentLevel EmptyTree = putStrLn $ replicate indentLevel ' ' ++ "Empty Tree"
+printRouteTree indentLevel (Node (NodeRoute routeId stops'') children) = do
+    putStrLn $ replicate indentLevel ' ' ++ "Route ID: " ++ routeId
+    putStrLn $ replicate indentLevel ' ' ++ "Stops: " ++ show stops''
+    putStrLn $ replicate indentLevel ' ' ++ "Children:"
+    mapM_ (printRouteTree (indentLevel + 2)) children
 
-printRoute :: Route -> IO ()
-printRoute (Route routeId stops'' nestedRoutes) = do
-    putStrLn $ "  Route ID: " ++ routeId
-    putStrLn $ "  Stops: " ++ show stops''
-    putStrLn "  Nested Routes:"
-    mapM_ printRoute nestedRoutes
+printRoute :: Int -> Route -> IO ()
+printRoute indentLevel (Route routeId stops'' nestedRoutes) = do
+    putStrLn $ replicate indentLevel ' ' ++ "Route ID: " ++ routeId
+    putStrLn $ replicate indentLevel ' ' ++ "Stops: " ++ show stops''
+    putStrLn $ replicate indentLevel ' ' ++ "Nested Routes:"
+    mapM_ (printRoute (indentLevel + 2)) nestedRoutes
 
 printStop :: Stop -> IO ()
 printStop (Stop stopId) = putStrLn $ "  Stop ID: " ++ stopId
+
 
 main :: IO ()
 main = do

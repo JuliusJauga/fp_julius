@@ -54,6 +54,10 @@ Changes that were made to the BNF are documented on fp_julius/ChangesMadeToGramm
 
 Commands and expected output are provided in fp_julius/stateTransitionWalkthrough.hs
 
+```
+cd fp_julius/src
+stack runghc stateTransitionWalkthrough.hs
+```
 
 ## BNF
 The grammar for this domain is provided in fp_julius/grammar.txt.

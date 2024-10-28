@@ -7,6 +7,8 @@
 <route_get> ::= "route-get " <name>
 <route_add_route> ::= "route-add-route " <route> " " <route>
 <route_remove> ::= "route-remove " <name>
+<route_add_stop> :: "route-add-stop " <name> <stop>
+<route_remove_stop> :: "route-remove-stop " <name> <stop>
 
 <stop_create> ::= "stop-create " <name>
 <stop_delete> ::= "stop-delete " <name>

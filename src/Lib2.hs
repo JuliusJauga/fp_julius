@@ -8,7 +8,26 @@ module Lib2 (
         parseQuery,
         parseRouteSystem,
         stateTransition,
-        initialState
+        initialState,
+        singletonRoute,
+        insertRoute,
+        insertNestedRoutes,
+        rebuildRoute,
+        nodeStopsFromTree,
+        parseListAdd,
+        parseListCreate,
+        parseListGet,
+        parseListRemove,
+        parseRouteCreate,
+        parseRouteGet,
+        parseRouteAddRoute,
+        parseRouteRemove,
+        parseStopCreate,
+        parseStopDelete,
+        parseStop,
+        parseRouteList,
+        parseStopList,
+        parseRoute
     ) where
 
     import Data.Char (isSpace, isAlphaNum)
@@ -88,26 +107,26 @@ module Lib2 (
             Left _ -> Left "Expected '<' at the start of route."
 
     -- Parse a list of routes
-    -- <route_list_internal> ::= <route>*
+    -- <nested_route_list> ::= <route>*
     parseRouteList :: String -> Either String ([Route], String)
     parseRouteList input =
+            case parseMany parseRoute input of
+                Right (routes'', rest1) -> Right (routes'', rest1)
+                Left _ -> Left "Failed to parse route list."
+
+    -- Parse a route system
+    -- <route_list_internal> ::= <route>*
+    parseRouteSystem :: String -> Either String ([Route], String)
+    parseRouteSystem input =
         case char '[' input of
             Right (_, rest1) ->
                 case parseMany parseRoute rest1 of
                     Right (routes'', rest2) ->
                         case char ']' rest2 of
                             Right (_, rest3) -> Right (routes'', rest3)
-                            Left _ -> Left "Expected ']' at the end of route list."
+                            Left _ -> Left "Failed to parse route system."
                     Left _ -> Left "Failed to parse route list."
-            Left _ -> Left "Expected '[' at the start of route list."
-
-    -- Parse a route system
-    -- <route_list_internal> ::= <route>*
-    parseRouteSystem :: String -> Either String ([Route], String)
-    parseRouteSystem input =
-        case parseRouteList input of
-            Right (routes'', rest) -> Right (routes'', rest)
-            Left _ -> Left "Failed to parse route system."
+            Left _ -> Left "Expected '[' at the start of route system."
 
     -- Helper function to parse a string. Just to parse querys
     string :: String -> String -> Either String (String, String)
@@ -154,6 +173,17 @@ module Lib2 (
                     Right (listName, rest') -> Right (ListGet listName, rest')
                     Left _ -> Left "Expected a valid list name."
             Left _ -> Left "Expected 'list-get'."
+    
+    -- Parse a list-remove query
+    -- <list_remove> ::= "list-remove " <name>
+    parseListRemove :: String -> Either String (Query, String)
+    parseListRemove input =
+        case string "list-remove " input of
+            Right (_, rest) ->
+                case name rest of
+                    Right (listName, rest') -> Right (ListRemove listName, rest')
+                    Left _ -> Left "Expected a valid list name."
+            Left _ -> Left "Expected 'list-remove'."
 
     -- Parse a list-remove query
     -- <list_remove> ::= "list-remove " <name>
@@ -239,26 +269,29 @@ module Lib2 (
                         case parseListGet input of
                             Right (query, _) -> Right query
                             Left _ ->
-                                case parseRouteCreate input of
+                                case parseListRemove input of
                                     Right (query, _) -> Right query
                                     Left _ ->
-                                        case parseRouteGet input of
+                                        case parseRouteCreate input of
                                             Right (query, _) -> Right query
                                             Left _ ->
-                                                case parseRouteAddRoute input of
+                                                case parseRouteGet input of
                                                     Right (query, _) -> Right query
                                                     Left _ ->
-                                                        case parseRouteRemove input of
+                                                        case parseRouteAddRoute input of
                                                             Right (query, _) -> Right query
                                                             Left _ ->
-                                                                case parseStopCreate input of
+                                                                case parseRouteRemove input of
                                                                     Right (query, _) -> Right query
                                                                     Left _ ->
-                                                                        case parseStopDelete input of
+                                                                        case parseStopCreate input of
                                                                             Right (query, _) -> Right query
-                                                                            Left _ -> Left "Invalid query."
+                                                                            Left _ ->
+                                                                                case parseStopDelete input of
+                                                                                    Right (query, _) -> Right query
+                                                                                    Left _ -> Left "Invalid query."
 
-
+    -- Query definition.
     data Query
         = ListCreate String
         | ListAdd String Route
@@ -299,11 +332,11 @@ module Lib2 (
         , nodeStops :: [Stop]
         } deriving (Show, Eq)
 
-    -- Define the RouteTree functions
+    -- Helper functio to make a new RouteTree
     singletonRoute :: Route -> RouteTree
     singletonRoute route = Node (NodeRoute (routeId' route) (stops' route)) []
 
-    -- Define the RouteTree functions
+    -- Inserting a route to a tree, this is for building a tree structure from route.
     insertRoute :: Route -> RouteTree -> RouteTree
     insertRoute route EmptyTree =
         let newNode = singletonRoute route
@@ -314,7 +347,7 @@ module Lib2 (
             newNodeWithChildren = insertNestedRoutes newNode (nestedRoutes' route)
         in Node rootRoute (newNodeWithChildren : childRoutes)
 
-    -- Helper function to insert nested routes into a RouteTree 
+    -- -- Helper function to insert nested routes into a RouteTree 
     insertNestedRoutes :: RouteTree -> [Route] -> RouteTree
     insertNestedRoutes = foldl (flip insertRoute)
 
@@ -332,20 +365,25 @@ module Lib2 (
             stops :: [Stop]
         } deriving (Show, Eq)
 
-
+    -- Define initial state
     initialState :: State
     initialState = State [] [] []
 
+    -- Define state transitions, this works with Tree data structure of RouteTree
+    -- RouteTreeLists are separate from routes and stops lists.
+    -- When adding a route to RouteTreeList, it adds a new RouteTree to that list
+    -- All of the nested routes get built in tree structure. Nested routes become child Nodes of a root route.
+    -- When removing a list, the same tree structures get rebuilt back into Route types recursively.
     stateTransition :: State -> Query -> State
     stateTransition (State routeLists routes' stops'') (ListCreate listName) =
         State ((listName, []) : routeLists) routes' stops''
-
     stateTransition (State routeLists routes' stops'') (ListAdd listName route) =
         let (existingRoutes, remainingRoutes) = partition (\r -> routeId' r == routeId' route) routes'
+            updatedRoute = route { stops' = stops' route }
         in case existingRoutes of
             [] -> State routeLists routes' stops''
-            (r:_) ->
-                let routeTree = insertRoute r EmptyTree
+            (_:_) ->
+                let routeTree = insertRoute updatedRoute EmptyTree
                     updatedRouteLists = map (\(name', trees) ->
                         if name' == listName
                         then (name', routeTree : trees)
@@ -356,19 +394,19 @@ module Lib2 (
     stateTransition (State routeLists routes' stops'') (ListRemove listName) =
         let updatedRouteLists = filter (\(name', _) -> name' /= listName) routeLists
             removedRoutes = concatMap (\(_, trees) -> map rebuildRoute trees) (filter (\(name', _) -> name' == listName) routeLists)
-            removedStops = concatMap nodeStopsFromTree (concatMap snd (filter (\(name', _) -> name' == listName) routeLists))
-        in State updatedRouteLists (routes' ++ removedRoutes) (stops'' ++ removedStops)
+            uniqueRemovedRoutes = filter (\r -> not (any (\r' -> routeId' r == routeId' r') routes')) removedRoutes
+        in State updatedRouteLists (routes' ++ uniqueRemovedRoutes) stops''
     stateTransition (State routeLists routes' stops'') (RouteCreate routeId) =
         State routeLists (Route routeId [] [] : routes') stops''
     stateTransition (State routeLists routes' stops'') (RouteGet _) = State routeLists routes' stops''
     stateTransition (State routeLists routes' stops'') (RouteAddRoute parentRoute childRoute) =
         let
-        remainingRoutes = filter (\r -> routeId' r /= routeId' childRoute) routes'
-        updatedRoutes = map (\r ->
-                               if routeId' r == routeId' parentRoute
-                               then r { nestedRoutes' = nestedRoutes' r ++ [childRoute] }
-                               else r
-                           ) remainingRoutes
+            remainingRoutes = filter (\r -> routeId' r /= routeId' childRoute) routes'
+            updateNestedRoutes route =
+                if routeId' route == routeId' parentRoute
+                then route { nestedRoutes' = nestedRoutes' route ++ [childRoute] }
+                else route { nestedRoutes' = map updateNestedRoutes (nestedRoutes' route) }
+            updatedRoutes = map updateNestedRoutes remainingRoutes
         in State routeLists updatedRoutes stops''
     stateTransition (State routeLists routes' stops'') (RouteRemove routeId) =
         let (removedRoutes, remainingRoutes) = partition (\r -> routeId' r == routeId) routes'
@@ -380,24 +418,28 @@ module Lib2 (
         let (existingRoutes, remainingRoutes) = partition (\r -> routeId' r == routeId) routes'
         in case existingRoutes of
             [] -> State routeLists routes' stops''
-            (_:_) ->
+            (r:_) ->
                 let updatedRoutes = map (\r' ->
                         if routeId' r' == routeId
                         then r' { stops' = stops' r' ++ [stop] }
                         else r'
-                        ) remainingRoutes
+                        ) (r : remainingRoutes)
                 in State routeLists updatedRoutes stops''
     stateTransition (State routeLists routes' stops'') (RouteRemoveStop routeId stop) =
         let (existingRoutes, remainingRoutes) = partition (\r -> routeId' r == routeId) routes'
         in case existingRoutes of
             [] -> State routeLists routes' stops''
-            (_:_) ->
-                let updatedRoutes = map (\r' ->
-                        if routeId' r' == routeId
-                        then r' { stops' = filter (\s -> stopId' s /= stopId' stop) (stops' r') }
-                        else r'
-                        ) remainingRoutes
-                in State routeLists updatedRoutes stops''
+            (r:_) ->
+                if stop `elem` stops' r
+                then
+                    let updatedRoutes = map (\r' ->
+                            if routeId' r' == routeId
+                            then r' { stops' = filter (\s -> stopId' s /= stopId' stop) (stops' r') }
+                            else r'
+                            ) (r : remainingRoutes)
+                        updatedStops = stop : stops''
+                    in State routeLists updatedRoutes updatedStops
+                else State routeLists routes' stops''
     stateTransition (State routeLists routes' stops'') (StopCreate stopId) = State routeLists routes' (Stop stopId : stops'')
     stateTransition (State routeLists routes' stops'') (StopDelete stopId) =
         let (removedStops, remainingStops) = partition (\s -> stopId' s == stopId) stops''

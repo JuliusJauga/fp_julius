@@ -1,0 +1,85 @@
+Initial State:
+Route Tree Lists:
+Routes:
+Stops:
+
+After ListCreate 'List1':
+Route Tree Lists:
+List Name: StringName "List1"
+Routes:
+Stops:
+
+After RouteCreate 'Route1', 'Route2', 'Route3':
+Route Tree Lists:
+List Name: StringName "List1"
+Routes:
+Route ID: StringName "Route3"
+Stops: []
+Nested Routes:
+Route ID: StringName "Route2"
+Stops: []
+Nested Routes:
+Route ID: StringName "Route1"
+Stops: []
+Nested Routes:
+Stops:
+
+After RouteAddStop 'Route1' 'Stop1', 'Route2' 'Stop2', 'Route3' 'Stop3':
+Route Tree Lists:
+List Name: StringName "List1"
+Routes:
+Route ID: StringName "Route3"
+Stops: [Stop {stopId' = StringName "Stop3"}]
+Nested Routes:
+Route ID: StringName "Route2"
+Stops: [Stop {stopId' = StringName "Stop2"}]
+Nested Routes:
+Route ID: StringName "Route1"
+Stops: [Stop {stopId' = StringName "Stop1"}]
+Nested Routes:
+Stops:
+
+After RouteAddRoute 'Route1' -> 'Route2', 'Route2' -> 'Route3':
+Route Tree Lists:
+List Name: StringName "List1"
+Routes:
+Route ID: StringName "Route1"
+Stops: [Stop {stopId' = StringName "Stop1"}]
+Nested Routes:
+  Route ID: StringName "Route2"
+  Stops: []
+  Nested Routes:
+    Route ID: StringName "Route3"
+    Stops: []
+    Nested Routes:
+Stops:
+
+After ListAdd 'List1' with nested routes:
+Route Tree Lists:
+List Name: StringName "List1"
+  Route ID: StringName "Route1"
+  Stops: []
+  Children:
+    Route ID: StringName "Route2"
+    Stops: []
+    Children:
+      Route ID: StringName "Route3"
+      Stops: []
+      Children:
+Routes:
+Stops:
+
+After ListRemove 'List1':
+Route Tree Lists:
+Routes:
+Route ID: StringName "Route1"
+Stops: []
+Nested Routes:
+  Route ID: StringName "Route2"
+  Stops: []
+  Nested Routes:
+    Route ID: StringName "Route3"
+    Stops: []
+    Nested Routes:
+Stops:
+

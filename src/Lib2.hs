@@ -31,8 +31,8 @@ module Lib2 (
         parseRoute
     ) where
 
-    import Data.Char (isSpace, isAlphaNum, isNumber, isAlpha, isDigit, isLetter)
-    import Data.List (isPrefixOf, partition, singleton)
+    import Data.Char (isAlphaNum, isDigit, isLetter)
+    import Data.List (isPrefixOf, partition)
 
     data Name = NumberName Int | WordName String | StringName String
         deriving (Show, Eq)
@@ -102,7 +102,11 @@ module Lib2 (
     
     -- <string>
     parseStringName :: Parser Name
-    parseStringName input = Right (StringName input, "")
+    parseStringName input =
+        let (strName, rest) = span (\c -> isAlphaNum c || c == '_') input
+        in if null strName
+            then Left "Expected a valid string name."
+            else Right (StringName strName, rest)
 
     -- <name> ::= <word> " " <word> | <number> | <string>
     name :: Parser Name
@@ -198,6 +202,7 @@ module Lib2 (
                     Left _ -> Left "Expected a valid route ID."
             Left _ -> Left "Expected '<' at the start of route."
 
+
     -- Parse a list of routes
     -- <nested_route_list> ::= <route>*
     parseRouteList :: String -> Either String ([Route], String)
@@ -249,9 +254,12 @@ module Lib2 (
             Right (_, rest) ->
                 case name rest of
                     Right (listName, rest1) ->
-                        case parseRoute rest1 of
-                            Right (route, rest2) -> Right (ListAdd listName route, rest2)
-                            Left _ -> Left "Expected a valid route."
+                        case char ' ' rest1 of
+                            Right (_, rest2) ->
+                                case parseRoute rest2 of
+                                    Right (route, rest3) -> Right (ListAdd listName route, rest3)
+                                    Left _ -> Left "Expected a valid route."
+                            Left _ -> Left "Expected whitespace after list name."
                     Left _ -> Left "Expected a valid list name."
             Left _ -> Left "Expected 'list-add'."
 
@@ -457,7 +465,7 @@ module Lib2 (
         { routeTreeLists :: [(Name, [RouteTree])],
             routes :: [Route],
             stops :: [Stop]
-        } deriving Show
+        } deriving (Show, Eq)
 
     -- Define initial state
     initialState :: State

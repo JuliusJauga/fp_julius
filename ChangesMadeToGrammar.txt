@@ -9,3 +9,13 @@ The following changes were made to grammar:
         3. list-remove <list> <name>        - - >   <list_remove> ::= "list-remove " <name>       (Changed to instead remove the whole list)
         4. route-get <route> <name>         - - >   <route_get> ::= "route-get " <name>           (Change to return route by name, because this makes more sense in state transition work flow)
         5. route-remove <route> <stop_name> - - >   <route_remove> ::= "route-remove " <name>     (Changed for easier usage, instead finds a route by that name and removes it)
+    4. Changes to name in BNF.                              (This change was added so that parser composing could be demonstrated)
+        1. A name can be one of three types of names.
+        2. <string_name> is made of letters and numbers.
+        3. <number_name> is a name made of digits.
+        4. <word_name> is a name made of different words.
+    5. Added components.    (Main building blocks for different types of names)
+        1. <letter>     
+        2. <digit>      
+        3. <word>       
+        4. <number>     

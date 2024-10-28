@@ -7,6 +7,7 @@ import Lib2 (
     State(..),
     RouteTree(..),
     NodeRoute(..),
+    Name(..),
     stateTransition,
     initialState
     )
@@ -22,28 +23,28 @@ printState (State routeTreeLists' routes' stops'') = do
     mapM_ printStop stops''
     putStrLn ""
 
-printRouteTreeList :: Int -> (String, [RouteTree]) -> IO ()
+printRouteTreeList :: Int -> (Name, [RouteTree]) -> IO ()
 printRouteTreeList indentLevel (name, trees) = do
-    putStrLn $ replicate indentLevel ' ' ++ "List Name: " ++ name
+    putStrLn $ replicate indentLevel ' ' ++ "List Name: " ++ show name
     mapM_ (printRouteTree (indentLevel + 2)) trees
 
 printRouteTree :: Int -> RouteTree -> IO ()
 printRouteTree indentLevel EmptyTree = putStrLn $ replicate indentLevel ' ' ++ "Empty Tree"
 printRouteTree indentLevel (Node (NodeRoute routeId stops'') children) = do
-    putStrLn $ replicate indentLevel ' ' ++ "Route ID: " ++ routeId
+    putStrLn $ replicate indentLevel ' ' ++ "Route ID: " ++ show routeId
     putStrLn $ replicate indentLevel ' ' ++ "Stops: " ++ show stops''
     putStrLn $ replicate indentLevel ' ' ++ "Children:"
     mapM_ (printRouteTree (indentLevel + 2)) children
 
 printRoute :: Int -> Route -> IO ()
 printRoute indentLevel (Route routeId stops'' nestedRoutes) = do
-    putStrLn $ replicate indentLevel ' ' ++ "Route ID: " ++ routeId
+    putStrLn $ replicate indentLevel ' ' ++ "Route ID: " ++ show routeId
     putStrLn $ replicate indentLevel ' ' ++ "Stops: " ++ show stops''
     putStrLn $ replicate indentLevel ' ' ++ "Nested Routes:"
     mapM_ (printRoute (indentLevel + 2)) nestedRoutes
 
 printStop :: Stop -> IO ()
-printStop (Stop stopId) = putStrLn $ "  Stop ID: " ++ stopId
+printStop (Stop stopId) = putStrLn $ "  Stop ID: " ++ show stopId
 
 
 main :: IO ()
@@ -58,7 +59,7 @@ main = do
     -- Stops:
 
     -- Create a list
-    let state2 = stateTransition state1 (ListCreate "List1")
+    let state2 = stateTransition state1 (ListCreate (StringName "List1"))
     putStrLn "After ListCreate 'List1':"
     printState state2
     -- Expected output:
@@ -68,9 +69,9 @@ main = do
     -- Stops:
 
     -- Create routes
-    let state3 = stateTransition state2 (RouteCreate "Route1")
-    let state4 = stateTransition state3 (RouteCreate "Route2")
-    let state5 = stateTransition state4 (RouteCreate "Route3")
+    let state3 = stateTransition state2 (RouteCreate (StringName "Route1"))
+    let state4 = stateTransition state3 (RouteCreate (StringName "Route2"))
+    let state5 = stateTransition state4 (RouteCreate (StringName "Route3"))
     putStrLn "After RouteCreate 'Route1', 'Route2', 'Route3':"
     printState state5
     -- Expected output:
@@ -89,9 +90,9 @@ main = do
     -- Stops:
 
     -- Add stops to routes
-    let state6 = stateTransition state5 (RouteAddStop "Route1" (Stop "Stop1"))
-    let state7 = stateTransition state6 (RouteAddStop "Route2" (Stop "Stop2"))
-    let state8 = stateTransition state7 (RouteAddStop "Route3" (Stop "Stop3"))
+    let state6 = stateTransition state5 (RouteAddStop (StringName "Route1") (Stop (StringName "Stop1")))
+    let state7 = stateTransition state6 (RouteAddStop (StringName "Route2") (Stop (StringName "Stop2")))
+    let state8 = stateTransition state7 (RouteAddStop (StringName "Route3") (Stop (StringName "Stop3")))
     putStrLn "After RouteAddStop 'Route1' 'Stop1', 'Route2' 'Stop2', 'Route3' 'Stop3':"
     printState state8
     -- Expected output:
@@ -110,8 +111,8 @@ main = do
     -- Stops:
 
     -- Add nested routes
-    let state9 = stateTransition state8 (RouteAddRoute (Route "Route1" [] []) (Route "Route2" [] []))
-    let state10 = stateTransition state9 (RouteAddRoute (Route "Route2" [] []) (Route "Route3" [] []))
+    let state9 = stateTransition state8 (RouteAddRoute (Route (StringName "Route1") [] []) (Route (StringName "Route2") [] []))
+    let state10 = stateTransition state9 (RouteAddRoute (Route (StringName "Route2") [] []) (Route (StringName "Route3") [] []))
     putStrLn "After RouteAddRoute 'Route1' -> 'Route2', 'Route2' -> 'Route3':"
     printState state10
     -- Expected output:
@@ -130,7 +131,7 @@ main = do
     -- Stops:
 
     -- Add the nested route to the list
-    let state11 = stateTransition state10 (ListAdd "List1" (Route "Route1" [] [Route "Route2" [] [Route "Route3" [] []]]))
+    let state11 = stateTransition state10 (ListAdd (StringName "List1") (Route (StringName "Route1") [] [Route (StringName "Route2") [] [Route (StringName "Route3") [] []]]))
     putStrLn "After ListAdd 'List1' with nested routes:"
     printState state11
     -- Expected output:
@@ -158,7 +159,7 @@ main = do
     -- Stops:
 
     -- Remove the list
-    let state12 = stateTransition state11 (ListRemove "List1")
+    let state12 = stateTransition state11 (ListRemove (StringName "List1"))
     putStrLn "After ListRemove 'List1':"
     printState state12
     -- Expected output:

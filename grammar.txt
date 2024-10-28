@@ -21,5 +21,17 @@
 <stop> ::= "(" <stop_id> ")"
 <route_id> ::= <name>
 <stop_id> ::= <name>
-<name> ::= <char>+ | <name> " " <name>
+
+<name> ::= <word> " " <word> | <number> | <string>
+
+<number_name> ::= <number>+ | <number_name> " " <number_name>
+<number> ::= <digit>+
+<digit> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+<word_name> ::= <word> " " <word>
+<word> ::= <letter>+
+<letter> ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+
+<string_name> ::= <string> " " <string>
+<string> ::= <char>+ 
 <char> ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"

@@ -5,6 +5,7 @@ module Lib2 (
         State(..),
         RouteTree(..),
         NodeRoute(..),
+        Name(..),
         parseQuery,
         parseRouteSystem,
         stateTransition,
@@ -30,10 +31,101 @@ module Lib2 (
         parseRoute
     ) where
 
-    import Data.Char (isSpace, isAlphaNum)
-    import Data.List (isPrefixOf, partition)
+    import Data.Char (isSpace, isAlphaNum, isNumber, isAlpha, isDigit, isLetter)
+    import Data.List (isPrefixOf, partition, singleton)
+
+    data Name = NumberName Int | WordName String | StringName String
+        deriving (Show, Eq)
+
+    newtype CustomWord = CustomWord String
+        deriving (Show, Eq)
+        
+    type Parser a = String -> Either String (a, String)
+
+    and3' :: (a -> b -> c -> d) -> Parser a -> Parser b -> Parser c -> Parser d
+    and3' f a b c input =
+        case a input of
+            Right (v1, r1) ->
+                case b r1 of
+                    Right (v2, r2) ->
+                        case c r2 of
+                            Right (v3, r3) -> Right (f v1 v2 v3, r3)
+                            Left e3 -> Left e3
+                    Left e2 -> Left e2
+            Left e1 -> Left e1
+
+            
+    or2 :: Parser a -> Parser a -> Parser a
+    or2 a b input =
+        case a input of
+            Right r1 -> Right r1
+            Left e1 ->
+                case b input of
+                    Right r2 -> Right r2
+                    Left e2 -> Left (e1 ++ ", " ++ e2)
+    
+    -- <char>
+    parseChar :: Char -> Parser Char
+    parseChar c [] = Left ("Cannot find " ++ [c] ++ " in an empty input")
+    parseChar c s@(h:t) = if c == h then Right (c, t) else Left (c : " is not found in " ++ s)
+
+    -- <word>
+    parseWord :: Parser CustomWord
+    parseWord input =
+        let letters = takeWhile isLetter input
+            rest = drop (length letters) input
+        in if not (null letters)
+            then Right (CustomWord letters, rest)
+            else Left (input ++ " does not start with a letter")
+
+    -- <number>
+    parseNumber :: Parser Int
+    parseNumber [] = Left "empty input, cannot parse a number"
+    parseNumber str =
+        let
+            digits = takeWhile isDigit str
+            rest = drop (length digits) str
+        in
+            case digits of
+                [] -> Left "not a number"
+                _ -> Right (read digits, rest)
+
+    -- <word> " " <word>
+    parseWordName :: Parser Name
+    parseWordName = and3' (\(CustomWord a) _ (CustomWord b) -> WordName (a ++ " " ++ b)) parseWord (parseChar ' ') parseWord
+
+    parseNumberName :: Parser Name
+    parseNumberName input = 
+        case parseNumber input of
+            Right (num, rest) -> Right (NumberName num, rest)
+            Left err -> Left err
+    
+    -- <string>
+    parseStringName :: Parser Name
+    parseStringName input = Right (StringName input, "")
+
+    -- <name> ::= <word> " " <word> | <number> | <string>
+    name :: Parser Name
+    name = parseWordName `or2` parseNumberName `or2` parseStringName
 
     -- Parsing components
+
+    -- Helper to aggregate error messages with a focus on route parsing
+    orElse :: (String -> Either String a) -> (String -> Either String a) -> String -> Either String a
+    orElse p1 p2 input = case p1 input of
+        Right result -> Right result
+        Left err1 -> case p2 input of
+            Right result -> Right result
+            Left err2
+                -- Check if both errors are about invalid route format
+                | err1 == "Invalid route format." && err2 == "Invalid route format." ->
+                    Left "Invalid route format. Expected a valid route definition."
+                -- Avoid repeating the combined error message
+                | "Invalid route format. Expected a valid route definition." `isPrefixOf` err1 -> Left err1
+                | "Invalid route format. Expected a valid route definition." `isPrefixOf` err2 -> Left err2
+                | otherwise -> Left (err1 ++ "; " ++ err2)
+
+
 
     -- Helper function to parse many elements using another parser
     parseMany :: (String -> Either String (a, String)) -> String -> Either String ([a], String)
@@ -54,12 +146,12 @@ module Lib2 (
 
     -- Parse a name
     -- <name> ::= <char>+ | <name> " " <name>
-    name :: String -> Either String (String, String)
-    name input =
-        let (n, rest) = span (\c -> isAlphaNum c || c == ' ') input
-            trimmedName = reverse (dropWhile isSpace (reverse (dropWhile isSpace n)))
-        in if null trimmedName then Left "Expected a name, but found none"
-        else Right (trimmedName, rest)
+    -- name :: String -> Either String (String, String)
+    -- name input =
+    --     let (n, rest) = span (\c -> isAlphaNum c || c == ' ') input
+    --         trimmedName = reverse (dropWhile isSpace (reverse (dropWhile isSpace n)))
+    --     in if null trimmedName then Left "Expected a name, but found none"
+    --     else Right (trimmedName, rest)
 
     -- Parse a stop
     -- <stop> ::= "(" <stop_id> ")"
@@ -293,30 +385,30 @@ module Lib2 (
 
     -- Query definition.
     data Query
-        = ListCreate String
-        | ListAdd String Route
-        | ListGet String
-        | ListRemove String
-        | RouteCreate String
-        | RouteGet String
+        = ListCreate Name
+        | ListAdd Name Route
+        | ListGet Name
+        | ListRemove Name
+        | RouteCreate Name
+        | RouteGet Name
         | RouteAddRoute Route Route
-        | RouteAddStop String Stop
-        | RouteRemoveStop String Stop
-        | RouteRemove String
-        | StopCreate String
-        | StopDelete String
+        | RouteAddStop Name Stop
+        | RouteRemoveStop Name Stop
+        | RouteRemove Name
+        | StopCreate Name
+        | StopDelete Name
         deriving (Show, Eq)
 
     -- Define the Route data type
     data Route = Route
-        { routeId' :: String
+        { routeId' :: Name
         , stops' :: [Stop]
         , nestedRoutes' :: [Route]
         } deriving (Show, Eq)
 
     -- Define the Stop data type
     newtype Stop = Stop
-        { stopId' :: String
+        { stopId' :: Name
         } deriving (Show, Eq)
 
     -- Define the RouteTree data type
@@ -328,7 +420,7 @@ module Lib2 (
 
     -- Define the NodeRoute data type
     data NodeRoute = NodeRoute
-        { nodeRouteId :: String
+        { nodeRouteId :: Name
         , nodeStops :: [Stop]
         } deriving (Show, Eq)
 
@@ -353,17 +445,19 @@ module Lib2 (
 
     -- Helper function to rebuild a Route from a RouteTree
     rebuildRoute :: RouteTree -> Route
-    rebuildRoute EmptyTree = Route "" [] []
+    rebuildRoute EmptyTree = Route singletonName [] []
     rebuildRoute (Node nodeRoute subTrees) =
         Route (nodeRouteId nodeRoute) (nodeStops nodeRoute) (map rebuildRoute subTrees)
 
+    singletonName :: Name
+    singletonName = StringName ""
 
     -- Define the State data type
     data State = State
-        { routeTreeLists :: [(String, [RouteTree])],
+        { routeTreeLists :: [(Name, [RouteTree])],
             routes :: [Route],
             stops :: [Stop]
-        } deriving (Show, Eq)
+        } deriving Show
 
     -- Define initial state
     initialState :: State

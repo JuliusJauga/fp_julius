@@ -14,11 +14,17 @@ When adding a route to a list of routes, the route gets processed into a tree st
 
 #### ADT implementation
 Route1 is defined like this: Route {routeId' = "R1", stops' = \[stop1, stop11\], nestedRoutes' = \[route2\]}
+
 Route2 is defined like this: Route {routeId' = "R2", stops' = \[stop2\], nestedRoutes' = \[route3\]}
+
 Route2 is defined like this: Route {routeId' = "R3", stops' = \[stop3, stop33\], nestedRoutes' = \[\]}
+
 Route4 is defined like this: Route {routeId' = "R4", stops' = \[stop4\], nestedRoutes' = \[route5, route6\]}
+
 Route5 is defined like this: Route {routeId' = "R5", stops' = \[\], nestedRoutes' = \[\]}
+
 Route6 is defined like this: Route {routeId' = "R6", stops' = \[\], nestedRoutes' = \[\]}
+
 When inserting Route1 and Route4 to the tree the structure becomes this:
 ```    
 [   _________List1________      ,       ______List2______   ]

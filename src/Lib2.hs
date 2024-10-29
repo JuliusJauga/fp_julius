@@ -471,14 +471,17 @@ module Lib2 (
         in case existingRoutes of
             [] -> Left "No route found to add a stop to."
             (r:_) ->
-                let
-                    updatedRoutes = map (\r' ->
-                            if routeId' r' == routeId
-                            then r' { stops' = stops' r' ++ [stop] }
-                            else r'
-                        ) (r : remainingRoutes)
-                    updatedStops = filter (\s -> stopId' s /= stopId' stop) stops''
-                in Right $ State routeLists updatedRoutes updatedStops
+                if stop `elem` stops''
+                then
+                    let
+                        updatedRoutes = map (\r' ->
+                                if routeId' r' == routeId
+                                then r' { stops' = stops' r' ++ [stop] }
+                                else r'
+                            ) (r : remainingRoutes)
+                        updatedStops = filter (\s -> stopId' s /= stopId' stop) stops''
+                    in Right $ State routeLists updatedRoutes updatedStops
+                else Left "Stop not found in the stops list."
 
     stateTransition (State routeLists routes' stops'') (RouteRemoveStop routeId stop) =
         let (existingRoutes, remainingRoutes) = partition (\r -> routeId' r == routeId) routes'

@@ -1,0 +1,55 @@
+>>> list-create List1
+Transition succeeded.
+State {routeTreeLists = [(StringName "List1",[])], routes = [], stops = []}
+>>> list-add List1 <Route1{}>
+ERROR:No existing routes found to add.
+>>> route-create Route1
+Transition succeeded.
+State {routeTreeLists = [(StringName "List1",[])], routes = [Route {routeId' = StringName "Route1", stops' = [], nestedRoutes' = []}], stops = []}
+>>> list-add List1 <Route1{}>
+Transition succeeded.
+State {routeTreeLists = [(StringName "List1",[Node (NodeRoute {nodeRouteId = StringName "Route1", nodeStops = []}) []])], routes = [], stops = []}
+>>> route-create Route2
+Transition succeeded.
+State {routeTreeLists = [(StringName "List1",[Node (NodeRoute {nodeRouteId = StringName "Route1", nodeStops = []}) []])], routes = [Route {routeId' = StringName "Route2", stops' = [], nestedRoutes' = []}], stops = []}
+>>> route-create Route2Child
+Transition succeeded.
+State {routeTreeLists = [(StringName "List1",[Node (NodeRoute {nodeRouteId = StringName "Route1", nodeStops = []}) []])], routes = [Route {routeId' = StringName "Route2Child", stops' = [], nestedRoutes' = []},Route {routeId' = StringName "Route2", stops' = [], nestedRoutes' = []}], stops = []}
+>>> route-add-stop Route2Child (Stop1)
+ERROR:Stop not found in the stops list.
+>>> stop-create Stop1
+Transition succeeded.
+State {routeTreeLists = [(StringName "List1",[Node (NodeRoute {nodeRouteId = StringName "Route1", nodeStops = []}) []])], routes = [Route {routeId' = StringName "Route2Child", stops' = [], nestedRoutes' = []},Route {routeId' = StringName "Route2", stops' = [], nestedRoutes' = []}], stops = [Stop {stopId' = StringName "Stop1"}]}
+>>> route-add-stop Route2Child (Stop1)
+Transition succeeded.
+State {routeTreeLists = [(StringName "List1",[Node (NodeRoute {nodeRouteId = StringName "Route1", nodeStops = []}) []])], routes = [Route {routeId' = StringName "Route2Child", stops' = [Stop {stopId' = StringName "Stop1"}], nestedRoutes' = []},Route {routeId' = StringName "Route2", stops' = [], nestedRoutes' = []}], stops = []}
+>>> route-create Route2GrandChild
+Transition succeeded.
+State {routeTreeLists = [(StringName "List1",[Node (NodeRoute {nodeRouteId = StringName "Route1", nodeStops = []}) []])], routes = [Route {routeId' = StringName "Route2GrandChild", stops' = [], nestedRoutes' = []},Route {routeId' = StringName "Route2Child", stops' = [Stop {stopId' = StringName "Stop1"}], nestedRoutes' = []},Route {routeId' = StringName "Route2", stops' = [], nestedRoutes' = []}], stops = []}
+>>> route-add-route <Route1{}> <Route2{}>
+Transition succeeded.
+State {routeTreeLists = [(StringName "List1",[Node (NodeRoute {nodeRouteId = StringName "Route1", nodeStops = []}) []])], routes = [Route {routeId' = StringName "Route2GrandChild", stops' = [], nestedRoutes' = []},Route {routeId' = StringName "Route2Child", stops' = [Stop {stopId' = StringName "Stop1"}], nestedRoutes' = []}], stops = []}
+>>> list-remove List1
+Transition succeeded.
+State {routeTreeLists = [], routes = [Route {routeId' = StringName "Route2GrandChild", stops' = [], nestedRoutes' = []},Route {routeId' = StringName "Route2Child", stops' = [Stop {stopId' = StringName "Stop1"}], nestedRoutes' = []},Route {routeId' = StringName "Route1", stops' = [], nestedRoutes' = []}], stops = []}
+>>> route-add-route <Route1{}> <Route2{}>
+Transition succeeded.
+State {routeTreeLists = [], routes = [Route {routeId' = StringName "Route2GrandChild", stops' = [], nestedRoutes' = []},Route {routeId' = StringName "Route2Child", stops' = [Stop {stopId' = StringName "Stop1"}], nestedRoutes' = []},Route {routeId' = StringName "Route1", stops' = [], nestedRoutes' = [Route {routeId' = StringName "Route2", stops' = [], nestedRoutes' = []}]}], stops = []}
+>>> route-add-route <Route2{}> <Route2Child{}>
+Transition succeeded.
+State {routeTreeLists = [], routes = [Route {routeId' = StringName "Route2GrandChild", stops' = [], nestedRoutes' = []},Route {routeId' = StringName "Route1", stops' = [], nestedRoutes' = [Route {routeId' = StringName "Route2", stops' = [], nestedRoutes' = [Route {routeId' = StringName "Route2Child", stops' = [], nestedRoutes' = []}]}]}], stops = []}
+>>> route-add-route <Route2Child{}> <Route2GrandChild{}>
+Transition succeeded.
+State {routeTreeLists = [], routes = [Route {routeId' = StringName "Route1", stops' = [], nestedRoutes' = [Route {routeId' = StringName "Route2", stops' = [], nestedRoutes' = [Route {routeId' = StringName "Route2Child", stops' = [], nestedRoutes' = [Route {routeId' = StringName "Route2GrandChild", stops' = [], nestedRoutes' = []}]}]}]}], stops = []}
+>>> list-create List1
+Transition succeeded.
+State {routeTreeLists = [(StringName "List1",[])], routes = [Route {routeId' = StringName "Route1", stops' = [], nestedRoutes' = [Route {routeId' = StringName "Route2", stops' = [], nestedRoutes' = [Route {routeId' = StringName "Route2Child", stops' = [], nestedRoutes' = [Route {routeId' = StringName "Route2GrandChild", stops' = [], nestedRoutes' = []}]}]}]}], stops = []}
+>>> list-create List2
+Transition succeeded.
+State {routeTreeLists = [(StringName "List2",[]),(StringName "List1",[Node (NodeRoute {nodeRouteId = StringName "Route1", nodeStops = []}) []])], routes = [Route {routeId' = StringName "RouteNew2", stops' = [], nestedRoutes' = []},Route {routeId' = StringName "RouteNew", stops' = [], nestedRoutes' = []}], stops = []}
+>>> route-add-route <RouteNew{}> <RouteNew2{}>
+Transition succeeded.
+State {routeTreeLists = [(StringName "List2",[]),(StringName "List1",[Node (NodeRoute {nodeRouteId = StringName "Route1", nodeStops = []}) []])], routes = [Route {routeId' = StringName "RouteNew", stops' = [], nestedRoutes' = [Route {routeId' = StringName "RouteNew2", stops' = [], nestedRoutes' = []}]}], stops = []}
+>>> list-add List2 <RouteNew{<RouteNew2{}>}>
+Transition succeeded.
+State {routeTreeLists = [(StringName "List2",[Node (NodeRoute {nodeRouteId = StringName "RouteNew", nodeStops = []}) [Node (NodeRoute {nodeRouteId = StringName "RouteNew2", nodeStops = []}) []]]),(StringName "List1",[Node (NodeRoute {nodeRouteId = StringName "Route1", nodeStops = []}) []])], routes = [], stops = []}

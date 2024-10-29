@@ -3,6 +3,7 @@ The following changes were made to grammar:
     2. New commands added:
         1. <route_add_stop> :: "route-add-stop " <name> <stop>          (Added for better control of state transitions)
         2. <route_remove_stop> :: "route-remove-stop " <name> <stop>    (Added for better control of state transitions)
+        3. <routes_from_stop> :: "routes-from-stop " <stop>             (Added for additional functionality)
     3. Changes to command parameters:
         1. list-add <list> <route>          - - >   <list_add> ::= "list-add " <name> <route>     (Changed for easier use in Tree structure, doesn't make sense to specify the whole list for adding a route)
         2. list-get <list> <name>           - - >   <list_get> ::= "list-get " <name>             (Changed to instead return a list with that name)

@@ -33,7 +33,7 @@ module Lib2 (
 
     import Data.Char (isAlphaNum, isDigit, isLetter)
     import Data.List (isPrefixOf, partition)
-    
+
     -- Define the Name data type
     data Name = NumberName Int | WordName String | StringName String
         deriving (Show, Eq)
@@ -41,33 +41,33 @@ module Lib2 (
     -- Define the custom word type.
     newtype CustomWord = CustomWord String
         deriving (Show, Eq)
-        
+
     -- Define the parser type
     type Parser a = String -> Either String (a, String)
 
     -- Define and
-    and7' :: (a -> b -> c -> d -> e -> f -> g -> h) 
-      -> Parser a 
-      -> Parser b 
-      -> Parser c 
-      -> Parser d 
-      -> Parser e 
-      -> Parser f 
-      -> Parser g 
+    and7' :: (a -> b -> c -> d -> e -> f -> g -> h)
+      -> Parser a
+      -> Parser b
+      -> Parser c
+      -> Parser d
+      -> Parser e
+      -> Parser f
+      -> Parser g
       -> Parser h
     and7' g a b c d e f g' input =
         case a input of
-            Right (v1, r1) -> 
+            Right (v1, r1) ->
                 case b r1 of
-                    Right (v2, r2) -> 
+                    Right (v2, r2) ->
                         case c r2 of
-                            Right (v3, r3) -> 
+                            Right (v3, r3) ->
                                 case d r3 of
-                                    Right (v4, r4) -> 
+                                    Right (v4, r4) ->
                                         case e r4 of
-                                            Right (v5, r5) -> 
+                                            Right (v5, r5) ->
                                                 case f r5 of
-                                                    Right (v6, r6) -> 
+                                                    Right (v6, r6) ->
                                                         case g' r6 of
                                                             Right (v7, r7) -> Right (g v1 v2 v3 v4 v5 v6 v7, r7)
                                                             Left e7 -> Left e7
@@ -77,7 +77,7 @@ module Lib2 (
                             Left e3 -> Left e3
                     Left e2 -> Left e2
             Left e1 -> Left e1
-    
+
     and6' :: (a -> b -> c -> d -> e -> f -> g) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f -> Parser g
     and6' g a b c d e f input =
         case a input of
@@ -149,7 +149,7 @@ module Lib2 (
                     Right (v2, r2) -> Right (f v1 v2, r2)
                     Left e2 -> Left e2
             Left e1 -> Left e1
-    
+
     or2 :: Parser a -> Parser a -> Parser a
     or2 a b input =
         case a input of
@@ -158,7 +158,7 @@ module Lib2 (
                 case b input of
                     Right r2 -> Right r2
                     Left e2 -> Left (e1 ++ ", " ++ e2)
-    
+
     -- <char>
     parseChar :: Char -> Parser Char
     parseChar c [] = Left ("Cannot find " ++ [c] ++ " in an empty input")
@@ -190,11 +190,11 @@ module Lib2 (
     parseWordName = and3' (\(CustomWord a) _ (CustomWord b) -> WordName (a ++ " " ++ b)) parseWord (parseChar ' ') parseWord
 
     parseNumberName :: Parser Name
-    parseNumberName input = 
+    parseNumberName input =
         case parseNumber input of
             Right (num, rest) -> Right (NumberName num, rest)
             Left err -> Left err
-    
+
     -- <string>
     parseStringName :: Parser Name
     parseStringName input =
@@ -210,13 +210,13 @@ module Lib2 (
     -- Parsing components
     -- Helper function to parse many elements using another parser
     parseMany :: Parser a -> Parser [a]
-    parseMany parser input = 
+    parseMany parser input =
         case parser input of
-            Right (x, rest) -> 
+            Right (x, rest) ->
                 case parseMany parser rest of
                     Right (xs, rest') -> Right (x:xs, rest')
                     Left _ -> Right ([x], rest)
-            Left _ -> Right ([], input) 
+            Left _ -> Right ([], input)
 
     -- Parse a single character
     -- <char> ::= "a" | "b" | "c" ...
@@ -245,7 +245,7 @@ module Lib2 (
     -- Parse a list of routes
     -- <nested_route_list> ::= <route>*
     parseRouteList :: Parser [Route]
-    parseRouteList input = 
+    parseRouteList input =
         case parseMany parseRoute input of
             Right (routes', rest) -> Right (routes', rest)
             Left _ -> Right ([], input)
@@ -286,18 +286,18 @@ module Lib2 (
     -- <list_remove> ::= "list-remove " <name>
     parseRouteCreate :: Parser Query
     parseRouteCreate = and2' (\_ routeId -> RouteCreate routeId) (string "route-create ") name
-    
+
     -- Parse a route-get query
     -- <route_get> ::= "route-get " <name>
     parseRouteGet :: Parser Query
     parseRouteGet = and2' (\_ routeId -> RouteGet routeId) (string "route-get ") name
-    
+
     -- Parse a route-add-route query
     -- <route_add_route> ::= "route-add-route " <route> <route>
     parseRouteAddRoute :: Parser Query
-    parseRouteAddRoute = and4' 
-        (\_ parentRoute _ childRoute -> RouteAddRoute parentRoute childRoute) 
-        (string "route-add-route ") 
+    parseRouteAddRoute = and4'
+        (\_ parentRoute _ childRoute -> RouteAddRoute parentRoute childRoute)
+        (string "route-add-route ")
         parseRoute
         (char ' ')
         parseRoute
@@ -305,7 +305,7 @@ module Lib2 (
     -- <route_remove> ::= "route-remove " <name>
     parseRouteRemove :: Parser Query
     parseRouteRemove = and2' (\_ routeId -> RouteRemove routeId) (string "route-remove ") name
-    
+
     -- Parse a stop-create query
     -- <stop_create> ::= "stop-create " <name>
     parseStopCreate :: Parser Query
@@ -325,13 +325,17 @@ module Lib2 (
     -- <route_add_stop> :: "route-add-stop " <name> <stop>
     parseRouteAddStop :: Parser Query
     parseRouteAddStop = and4' (\_ routeId _ stop -> RouteAddStop routeId stop) (string "route-add-stop ") name (char ' ') parseStop
-    
+
+    parseRoutesFromStop :: Parser Query
+    parseRoutesFromStop = and2' (\_ stop -> RoutesFromStop stop) (string "routes-from-stop ") parseStop
+
     -- Main query parser
     parseQuery :: Parser Query
-    parseQuery = 
+    parseQuery =
         parseListAdd `or2` parseListCreate `or2` parseListGet `or2` parseListRemove `or2`
         parseRouteCreate `or2` parseRouteGet `or2` parseRouteAddRoute `or2` parseRouteRemove `or2`
-        parseRouteAddStop `or2` parseRouteRemoveStop `or2` parseStopCreate `or2` parseStopDelete
+        parseRouteAddStop `or2` parseRouteRemoveStop `or2` parseStopCreate `or2` parseStopDelete `or2` parseRoutesFromStop
+
 
     -- Query definition.
     data Query
@@ -347,6 +351,7 @@ module Lib2 (
         | RouteRemove Name
         | StopCreate Name
         | StopDelete Name
+        | RoutesFromStop Stop
         deriving (Show, Eq)
 
     -- Define the Route data type
@@ -364,7 +369,7 @@ module Lib2 (
     -- Define the RouteTree data type
         -- This is a tree structure that represents a route system
         -- Every node in the tree is a Route, and child nodes are nested routes
-    
+
     data RouteTree = EmptyTree | Node NodeRoute [RouteTree]
         deriving (Show, Eq)
 
@@ -436,7 +441,7 @@ module Lib2 (
                         ) routeLists
                 in Right $ State updatedRouteLists remainingRoutes stops''
 
-    stateTransition (State routeLists routes' stops'') (ListGet _) = 
+    stateTransition (State routeLists routes' stops'') (ListGet _) =
         Right $ State routeLists routes' stops''
 
     stateTransition (State routeLists routes' stops'') (ListRemove listName) =
@@ -446,9 +451,11 @@ module Lib2 (
         in Right $ State updatedRouteLists (routes' ++ uniqueRemovedRoutes) stops''
 
     stateTransition (State routeLists routes' stops'') (RouteCreate routeId) =
-        Right $ State routeLists (Route routeId [] [] : routes') stops''
+        if any (\r -> routeId' r == routeId) routes'
+        then Left "Route already exists."
+        else Right $ State routeLists (Route routeId [] [] : routes') stops''
 
-    stateTransition (State routeLists routes' stops'') (RouteGet _) = 
+    stateTransition (State routeLists routes' stops'') (RouteGet _) =
         Right $ State routeLists routes' stops''
 
     stateTransition (State routeLists routes' stops'') (RouteAddRoute parentRoute childRoute) =
@@ -499,14 +506,21 @@ module Lib2 (
                     in Right $ State routeLists updatedRoutes updatedStops
                 else Left "Stop not found in the specified route."
 
-    stateTransition (State routeLists routes' stops'') (StopCreate stopId) = 
-        Right $ State routeLists routes' (Stop stopId : stops'')
+    stateTransition (State routeLists routes' stops'') (StopCreate stopId) =
+        if any (\s -> stopId' s == stopId) stops''
+        then Left "Stop already exists."
+        else Right $ State routeLists routes' (Stop stopId : stops'')
 
     stateTransition (State routeLists routes' stops'') (StopDelete stopId) =
         let (removedStops, remainingStops) = partition (\s -> stopId' s == stopId) stops''
         in case removedStops of
             [] -> Left "Stop not found to delete."
             (_:_) -> Right $ State routeLists routes' remainingStops
+    stateTransition (State routeLists routes' _) (RoutesFromStop stop) =
+        let routesFromStop' = routesFromStopInLists stop routeLists
+            routesFromStop'' = routeFromStopInNestedRoutes stop routes'
+        in Left $ displayRoutesFromStop (routesFromStop' ++ routesFromStop'') stop
+
 
 
     -- Helper function to extract all stops from a RouteTree
@@ -514,3 +528,38 @@ module Lib2 (
     nodeStopsFromTree EmptyTree = []
     nodeStopsFromTree (Node nodeRoute childRoutes) =
         nodeStops nodeRoute ++ concatMap nodeStopsFromTree childRoutes
+
+    -- Helper function to extract all possible routes from a stop in a route tree
+    -- This is a recursive function that traverses the tree and finds all possible routes from a stop
+    -- It returns a list of routes that contain the stop
+    routesFromStop :: Stop -> RouteTree -> [Route]
+    routesFromStop _ EmptyTree = []
+    routesFromStop stop (Node nodeRoute childRoutes) =
+        let routesFromChildren = concatMap (routesFromStop stop) childRoutes
+        in if stop `elem` nodeStops nodeRoute
+            then Route (nodeRouteId nodeRoute) (nodeStops nodeRoute) [] : routesFromChildren
+            else routesFromChildren
+
+    routesFromStopInList :: Stop -> [RouteTree] -> [Route]
+    routesFromStopInList stop = concatMap (routesFromStop stop)
+
+    routesFromStopInLists :: Stop -> [(Name, [RouteTree])] -> [Route]
+    routesFromStopInLists stop = concatMap (routesFromStopInList stop . snd)
+
+    routeFromStopInNestedRoutes :: Stop -> [Route] -> [Route]
+    routeFromStopInNestedRoutes _ [] = []
+    routeFromStopInNestedRoutes stop routes' =
+        let newTree = singletonRoute (Route singletonName [] [])
+            newTreeInserted = foldl (flip insertRoute) newTree routes'
+        in  routesFromStop stop newTreeInserted
+
+    displayRoutesFromStop :: [Route] -> Stop -> String
+    displayRoutesFromStop [] stop = "No routes found from " ++ displayStopName stop
+    displayRoutesFromStop routes' stop = "Routes found from " ++ displayStopName stop ++ " are: " ++ concatMap displayRouteName routes'
+
+    displayRouteName :: Route -> String
+    displayRouteName route = show (routeId' route) ++ " "
+
+    displayStopName :: Stop -> String
+    displayStopName = show
+

@@ -418,14 +418,15 @@ module Lib2 (
     -- When adding a route to RouteTreeList, it adds a new RouteTree to that list
     -- All of the nested routes get built in tree structure. Nested routes become child Nodes of a root route.
     -- When removing a list, the same tree structures get rebuilt back into Route types recursively.
-    stateTransition :: State -> Query -> State
+    stateTransition :: State -> Query -> Either String State
     stateTransition (State routeLists routes' stops'') (ListCreate listName) =
-        State ((listName, []) : routeLists) routes' stops''
+        Right $ State ((listName, []) : routeLists) routes' stops''
+
     stateTransition (State routeLists routes' stops'') (ListAdd listName route) =
         let (existingRoutes, remainingRoutes) = partition (\r -> routeId' r == routeId' route) routes'
             updatedRoute = route { stops' = stops' route }
         in case existingRoutes of
-            [] -> State routeLists routes' stops''
+            [] -> Left "No existing routes found to add."
             (_:_) ->
                 let routeTree = insertRoute updatedRoute EmptyTree
                     updatedRouteLists = map (\(name', trees) ->
@@ -433,46 +434,56 @@ module Lib2 (
                         then (name', routeTree : trees)
                         else (name', trees)
                         ) routeLists
-                in State updatedRouteLists remainingRoutes stops''
-    stateTransition (State routeLists routes' stops'') (ListGet _) = State routeLists routes' stops''
+                in Right $ State updatedRouteLists remainingRoutes stops''
+
+    stateTransition (State routeLists routes' stops'') (ListGet _) = 
+        Right $ State routeLists routes' stops''
+
     stateTransition (State routeLists routes' stops'') (ListRemove listName) =
         let updatedRouteLists = filter (\(name', _) -> name' /= listName) routeLists
             removedRoutes = concatMap (\(_, trees) -> map rebuildRoute trees) (filter (\(name', _) -> name' == listName) routeLists)
             uniqueRemovedRoutes = filter (\r -> not (any (\r' -> routeId' r == routeId' r') routes')) removedRoutes
-        in State updatedRouteLists (routes' ++ uniqueRemovedRoutes) stops''
+        in Right $ State updatedRouteLists (routes' ++ uniqueRemovedRoutes) stops''
+
     stateTransition (State routeLists routes' stops'') (RouteCreate routeId) =
-        State routeLists (Route routeId [] [] : routes') stops''
-    stateTransition (State routeLists routes' stops'') (RouteGet _) = State routeLists routes' stops''
+        Right $ State routeLists (Route routeId [] [] : routes') stops''
+
+    stateTransition (State routeLists routes' stops'') (RouteGet _) = 
+        Right $ State routeLists routes' stops''
+
     stateTransition (State routeLists routes' stops'') (RouteAddRoute parentRoute childRoute) =
-        let
-            remainingRoutes = filter (\r -> routeId' r /= routeId' childRoute) routes'
+        let remainingRoutes = filter (\r -> routeId' r /= routeId' childRoute) routes'
             updateNestedRoutes route =
                 if routeId' route == routeId' parentRoute
                 then route { nestedRoutes' = nestedRoutes' route ++ [childRoute] }
                 else route { nestedRoutes' = map updateNestedRoutes (nestedRoutes' route) }
             updatedRoutes = map updateNestedRoutes remainingRoutes
-        in State routeLists updatedRoutes stops''
+        in Right $ State routeLists updatedRoutes stops''
+
     stateTransition (State routeLists routes' stops'') (RouteRemove routeId) =
         let (removedRoutes, remainingRoutes) = partition (\r -> routeId' r == routeId) routes'
         in case removedRoutes of
-            [] -> State routeLists routes' stops''
-            (_:_) -> State routeLists remainingRoutes stops''
+            [] -> Left "No route found to remove."
+            (_:_) -> Right $ State routeLists remainingRoutes stops''
 
     stateTransition (State routeLists routes' stops'') (RouteAddStop routeId stop) =
         let (existingRoutes, remainingRoutes) = partition (\r -> routeId' r == routeId) routes'
         in case existingRoutes of
-            [] -> State routeLists routes' stops''
+            [] -> Left "No route found to add a stop to."
             (r:_) ->
-                let updatedRoutes = map (\r' ->
-                        if routeId' r' == routeId
-                        then r' { stops' = stops' r' ++ [stop] }
-                        else r'
+                let
+                    updatedRoutes = map (\r' ->
+                            if routeId' r' == routeId
+                            then r' { stops' = stops' r' ++ [stop] }
+                            else r'
                         ) (r : remainingRoutes)
-                in State routeLists updatedRoutes stops''
+                    updatedStops = filter (\s -> stopId' s /= stopId' stop) stops''
+                in Right $ State routeLists updatedRoutes updatedStops
+
     stateTransition (State routeLists routes' stops'') (RouteRemoveStop routeId stop) =
         let (existingRoutes, remainingRoutes) = partition (\r -> routeId' r == routeId) routes'
         in case existingRoutes of
-            [] -> State routeLists routes' stops''
+            [] -> Left "No route found to remove a stop from."
             (r:_) ->
                 if stop `elem` stops' r
                 then
@@ -482,14 +493,18 @@ module Lib2 (
                             else r'
                             ) (r : remainingRoutes)
                         updatedStops = stop : stops''
-                    in State routeLists updatedRoutes updatedStops
-                else State routeLists routes' stops''
-    stateTransition (State routeLists routes' stops'') (StopCreate stopId) = State routeLists routes' (Stop stopId : stops'')
+                    in Right $ State routeLists updatedRoutes updatedStops
+                else Left "Stop not found in the specified route."
+
+    stateTransition (State routeLists routes' stops'') (StopCreate stopId) = 
+        Right $ State routeLists routes' (Stop stopId : stops'')
+
     stateTransition (State routeLists routes' stops'') (StopDelete stopId) =
         let (removedStops, remainingStops) = partition (\s -> stopId' s == stopId) stops''
         in case removedStops of
-            [] -> State routeLists routes' stops''
-            (_:_) -> State routeLists routes' remainingStops
+            [] -> Left "Stop not found to delete."
+            (_:_) -> Right $ State routeLists routes' remainingStops
+
 
     -- Helper function to extract all stops from a RouteTree
     nodeStopsFromTree :: RouteTree -> [Stop]

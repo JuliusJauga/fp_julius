@@ -462,7 +462,10 @@ module Lib2 (
         let remainingRoutes = filter (\r -> routeId' r /= routeId' childRoute) routes'
             updateNestedRoutes route =
                 if routeId' route == routeId' parentRoute
-                then route { nestedRoutes' = nestedRoutes' route ++ [childRoute] }
+                then route { 
+                    stops' = stops' route ++ stops' childRoute,
+                    nestedRoutes' = nestedRoutes' route ++ [childRoute]
+                    }
                 else route { nestedRoutes' = map updateNestedRoutes (nestedRoutes' route) }
             updatedRoutes = map updateNestedRoutes remainingRoutes
         in Right $ State routeLists updatedRoutes stops''
@@ -486,8 +489,7 @@ module Lib2 (
                                 then r' { stops' = stops' r' ++ [stop] }
                                 else r'
                             ) (r : remainingRoutes)
-                        updatedStops = filter (\s -> stopId' s /= stopId' stop) stops''
-                    in Right $ State routeLists updatedRoutes updatedStops
+                    in Right $ State routeLists updatedRoutes stops''
                 else Left "Stop not found in the stops list."
 
     stateTransition (State routeLists routes' stops'') (RouteRemoveStop routeId stop) =
@@ -502,8 +504,7 @@ module Lib2 (
                             then r' { stops' = filter (\s -> stopId' s /= stopId' stop) (stops' r') }
                             else r'
                             ) (r : remainingRoutes)
-                        updatedStops = stop : stops''
-                    in Right $ State routeLists updatedRoutes updatedStops
+                    in Right $ State routeLists updatedRoutes stops''
                 else Left "Stop not found in the specified route."
 
     stateTransition (State routeLists routes' stops'') (StopCreate stopId) =

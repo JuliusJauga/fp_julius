@@ -1,85 +1,198 @@
-Initial State:
+>>> route-create r1
+Transition succeeded.
 Route Tree Lists:
 Routes:
-Stops:
-
-After ListCreate 'List1':
-Route Tree Lists:
-List Name: StringName "List1"
-Routes:
-Stops:
-
-After RouteCreate 'Route1', 'Route2', 'Route3':
-Route Tree Lists:
-List Name: StringName "List1"
-Routes:
-Route ID: StringName "Route3"
-Stops: []
-Nested Routes:
-Route ID: StringName "Route2"
-Stops: []
-Nested Routes:
-Route ID: StringName "Route1"
+Route ID: StringName "r1"
 Stops: []
 Nested Routes:
 Stops:
 
-After RouteAddStop 'Route1' 'Stop1', 'Route2' 'Stop2', 'Route3' 'Stop3':
+>>> route-create r2
+Transition succeeded.
 Route Tree Lists:
-List Name: StringName "List1"
 Routes:
-Route ID: StringName "Route3"
-Stops: [Stop {stopId' = StringName "Stop3"}]
+Route ID: StringName "r2"
+Stops: []
 Nested Routes:
-Route ID: StringName "Route2"
-Stops: [Stop {stopId' = StringName "Stop2"}]
-Nested Routes:
-Route ID: StringName "Route1"
-Stops: [Stop {stopId' = StringName "Stop1"}]
+Route ID: StringName "r1"
+Stops: []
 Nested Routes:
 Stops:
 
-After RouteAddRoute 'Route1' -> 'Route2', 'Route2' -> 'Route3':
+>>> stop-create s1
+Transition succeeded.
 Route Tree Lists:
-List Name: StringName "List1"
 Routes:
-Route ID: StringName "Route1"
-Stops: [Stop {stopId' = StringName "Stop1"}]
+Route ID: StringName "r2"
+Stops: []
 Nested Routes:
-  Route ID: StringName "Route2"
-  Stops: []
+Route ID: StringName "r1"
+Stops: []
+Nested Routes:
+Stops:
+  Stop ID: StringName "s1"
+
+>>> route-add-stop r2 (s1)
+Transition succeeded.
+Route Tree Lists:
+Routes:
+Route ID: StringName "r2"
+Stops: [Stop {stopId' = StringName "s1"}]
+Nested Routes:
+Route ID: StringName "r1"
+Stops: []
+Nested Routes:
+Stops:
+  Stop ID: StringName "s1"
+
+>>> route-add-route <r1{}> <r2{(s1)}>
+Transition succeeded.
+Route Tree Lists:
+Routes:
+Route ID: StringName "r1"
+Stops: [Stop {stopId' = StringName "s1"}]
+Nested Routes:
+  Route ID: StringName "r2"
+  Stops: [Stop {stopId' = StringName "s1"}]
   Nested Routes:
-    Route ID: StringName "Route3"
-    Stops: []
-    Nested Routes:
 Stops:
+  Stop ID: StringName "s1"
 
-After ListAdd 'List1' with nested routes:
+>>> list-create l1
+Transition succeeded.
 Route Tree Lists:
-List Name: StringName "List1"
-  Route ID: StringName "Route1"
-  Stops: []
+List Name: StringName "l1"
+Routes:
+Route ID: StringName "r1"
+Stops: [Stop {stopId' = StringName "s1"}]
+Nested Routes:
+  Route ID: StringName "r2"
+  Stops: [Stop {stopId' = StringName "s1"}]
+  Nested Routes:
+Stops:
+  Stop ID: StringName "s1"
+
+>>> list-add <r1{(s1)<r2{(s1)}>}>
+PARSE ERROR:<r1{(s1)<r2{(s1)}>}> does not start with a letter, not a number, Expected a valid string name., Expected 'list-create ', Expected 'list-get ', Expected 'list-remove ', Expected 'route-create ', Expected 'route-get ', Expected 'route-add-route ', Expected 'route-remove ', Expected 'route-add-stop ', Expected 'route-remove-stop ', Expected 'stop-create ', Expected 'stop-delete ', Expected 'routes-from-stop '
+>>> list-add l1 <r1{(s1)<r2{(s1)}>}>
+Transition succeeded.
+Route Tree Lists:
+List Name: StringName "l1"
+  Route ID: StringName "r1"
+  Stops: [Stop {stopId' = StringName "s1"}]
   Children:
-    Route ID: StringName "Route2"
-    Stops: []
+    Route ID: StringName "r2"
+    Stops: [Stop {stopId' = StringName "s1"}]
     Children:
-      Route ID: StringName "Route3"
-      Stops: []
-      Children:
 Routes:
 Stops:
+  Stop ID: StringName "s1"
 
-After ListRemove 'List1':
+>>> route-create r3
+Transition succeeded.
 Route Tree Lists:
+List Name: StringName "l1"
+  Route ID: StringName "r1"
+  Stops: [Stop {stopId' = StringName "s1"}]
+  Children:
+    Route ID: StringName "r2"
+    Stops: [Stop {stopId' = StringName "s1"}]
+    Children:
 Routes:
-Route ID: StringName "Route1"
+Route ID: StringName "r3"
 Stops: []
 Nested Routes:
-  Route ID: StringName "Route2"
-  Stops: []
-  Nested Routes:
-    Route ID: StringName "Route3"
-    Stops: []
-    Nested Routes:
 Stops:
+  Stop ID: StringName "s1"
 
+>>> route-create r4
+Transition succeeded.
+Route Tree Lists:
+List Name: StringName "l1"
+  Route ID: StringName "r1"
+  Stops: [Stop {stopId' = StringName "s1"}]
+  Children:
+    Route ID: StringName "r2"
+    Stops: [Stop {stopId' = StringName "s1"}]
+    Children:
+Routes:
+Route ID: StringName "r4"
+Stops: []
+Nested Routes:
+Route ID: StringName "r3"
+Stops: []
+Nested Routes:
+Stops:
+  Stop ID: StringName "s1"
+
+>>> route-create r5
+Transition succeeded.
+Route Tree Lists:
+List Name: StringName "l1"
+  Route ID: StringName "r1"
+  Stops: [Stop {stopId' = StringName "s1"}]
+  Children:
+    Route ID: StringName "r2"
+    Stops: [Stop {stopId' = StringName "s1"}]
+    Children:
+Routes:
+Route ID: StringName "r5"
+Stops: []
+Nested Routes:
+Route ID: StringName "r4"
+Stops: []
+Nested Routes:
+Route ID: StringName "r3"
+Stops: []
+Nested Routes:
+Stops:
+  Stop ID: StringName "s1"
+
+>>> route-add-stop r3 (s1)
+Transition succeeded.
+Route Tree Lists:
+List Name: StringName "l1"
+  Route ID: StringName "r1"
+  Stops: [Stop {stopId' = StringName "s1"}]
+  Children:
+    Route ID: StringName "r2"
+    Stops: [Stop {stopId' = StringName "s1"}]
+    Children:
+Routes:
+Route ID: StringName "r3"
+Stops: [Stop {stopId' = StringName "s1"}]
+Nested Routes:
+Route ID: StringName "r5"
+Stops: []
+Nested Routes:
+Route ID: StringName "r4"
+Stops: []
+Nested Routes:
+Stops:
+  Stop ID: StringName "s1"
+
+>>> route-add-route <r4{}> <r3{(s1)}>
+Transition succeeded.
+Route Tree Lists:
+List Name: StringName "l1"
+  Route ID: StringName "r1"
+  Stops: [Stop {stopId' = StringName "s1"}]
+  Children:
+    Route ID: StringName "r2"
+    Stops: [Stop {stopId' = StringName "s1"}]
+    Children:
+Routes:
+Route ID: StringName "r5"
+Stops: []
+Nested Routes:
+Route ID: StringName "r4"
+Stops: [Stop {stopId' = StringName "s1"}]
+Nested Routes:
+  Route ID: StringName "r3"
+  Stops: [Stop {stopId' = StringName "s1"}]
+  Nested Routes:
+Stops:
+  Stop ID: StringName "s1"
+
+>>> routes-from-stop (s1)
+Routes found from Stop {stopId' = StringName "s1"} are: StringName "r1" StringName "r2" StringName "r4" StringName "r3" 

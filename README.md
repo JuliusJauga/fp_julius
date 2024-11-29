@@ -61,7 +61,7 @@ stack runghc stateTransitionWalkthrough.hs
 
 ### Lab3 comments
 
-Implemented loading and saving state from a file.
+Implemented loading and saving state from a file. Example of batch querying workflow is in src/lab3_example.txt.
 
 ### Persistence commands
 

@@ -23,12 +23,14 @@ main = defaultMain tests
 tests :: TestTree
 tests = testGroup "Tests" [propertyTests]
 
+-- Lib2 component
 instance Arbitrary Lib2.Name where
     arbitrary = do
         n <- choose (1, 100) :: Gen Int
         s <- listOf1 $ elements ['a'..'z']
         elements [Lib2.StringName s]
 
+-- Lib2 query
 instance Arbitrary Lib2.Query where
     arbitrary = do
         name <- arbitrary
@@ -49,6 +51,7 @@ instance Arbitrary Lib2.Query where
               , pure $ Lib2.RoutesFromStop stop
               ]
 
+-- Lib2 component
 instance Arbitrary Lib2.State where
     arbitrary = do
         routeTreeLists <- resize 5 arbitrary
@@ -56,6 +59,7 @@ instance Arbitrary Lib2.State where
         stops <- resize 5 arbitrary
         pure $ Lib2.State routeTreeLists routes stops
 
+-- Lib2 component
 instance Arbitrary Lib2.Route where
     arbitrary = do
         routeId' <- arbitrary
@@ -63,11 +67,14 @@ instance Arbitrary Lib2.Route where
         nestedRoutes' <- resize 5 arbitrary
         pure $ Lib2.Route routeId' stops' nestedRoutes'
 
+
+-- Lib2 component
 instance Arbitrary Lib2.Stop where
     arbitrary = do
         stopId' <- arbitrary
         pure $ Lib2.Stop stopId'
 
+-- Lib2 component
 instance Arbitrary Lib2.RouteTree where
     arbitrary = do
         nodeRoute <- arbitrary
@@ -76,6 +83,7 @@ instance Arbitrary Lib2.RouteTree where
               , pure $ Lib2.Node nodeRoute routeTrees
               ]
 
+-- Lib2 component
 instance Arbitrary Lib2.NodeRoute where
     arbitrary = do
         nodeRouteId <- arbitrary

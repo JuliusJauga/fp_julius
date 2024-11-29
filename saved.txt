@@ -1,0 +1,10 @@
+BEGIN 
+route-create r3;
+route-create r4;
+route-add-route <r3{}> <r4{}>;
+list-create list;
+route-create r1;
+route-create r2;
+route-add-route <r1{}> <r2{}>;
+list-add list <r1{<r2{}>}>;
+END

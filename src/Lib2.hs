@@ -6,6 +6,7 @@ module Lib2 (
         RouteTree(..),
         NodeRoute(..),
         Name(..),
+        Parser,
         parseQuery,
         parseRouteSystem,
         stateTransition,
@@ -28,14 +29,20 @@ module Lib2 (
         parseStop,
         parseRouteList,
         parseStopList,
-        parseRoute
+        parseRoute,
+        and3',
+        string,
+        parseMany,
+        and2',
+        char,
+        or2
     ) where
 
     import Data.Char (isAlphaNum, isDigit, isLetter)
     import Data.List (isPrefixOf, partition)
 
     -- Define the Name data type
-    data Name = NumberName Int | WordName String | StringName String
+    data Name = StringName String
         deriving (Show, Eq)
 
     -- Define the custom word type.
@@ -185,15 +192,15 @@ module Lib2 (
                 [] -> Left "not a number"
                 _ -> Right (read digits, rest)
 
-    -- <word> " " <word>
-    parseWordName :: Parser Name
-    parseWordName = and3' (\(CustomWord a) _ (CustomWord b) -> WordName (a ++ " " ++ b)) parseWord (parseChar ' ') parseWord
+    -- -- <word> " " <word>
+    -- parseWordName :: Parser Name
+    -- parseWordName = and3' (\(CustomWord a) _ (CustomWord b) -> WordName (a ++ " " ++ b)) parseWord (parseChar ' ') parseWord
 
-    parseNumberName :: Parser Name
-    parseNumberName input =
-        case parseNumber input of
-            Right (num, rest) -> Right (NumberName num, rest)
-            Left err -> Left err
+    -- parseNumberName :: Parser Name
+    -- parseNumberName input =
+    --     case parseNumber input of
+    --         Right (num, rest) -> Right (NumberName num, rest)
+    --         Left err -> Left err
 
     -- <string>
     parseStringName :: Parser Name
@@ -205,7 +212,7 @@ module Lib2 (
 
     -- <name> ::= <word> " " <word> | <number> | <string>
     name :: Parser Name
-    name = parseWordName `or2` parseNumberName `or2` parseStringName
+    name = parseStringName
 
     -- Parsing components
     -- Helper function to parse many elements using another parser
@@ -354,6 +361,13 @@ module Lib2 (
         | RoutesFromStop Stop
         deriving (Show, Eq)
 
+    -- Define the State data type
+    data State = State
+        { routeTreeLists :: [(Name, [RouteTree])],
+            routes :: [Route],
+            stops :: [Stop]
+        } deriving (Show, Eq)
+
     -- Define the Route data type
     data Route = Route
         { routeId' :: Name
@@ -406,13 +420,6 @@ module Lib2 (
 
     singletonName :: Name
     singletonName = StringName ""
-
-    -- Define the State data type
-    data State = State
-        { routeTreeLists :: [(Name, [RouteTree])],
-            routes :: [Route],
-            stops :: [Stop]
-        } deriving (Show, Eq)
 
     -- Define initial state
     initialState :: State
@@ -521,8 +528,7 @@ module Lib2 (
         let routesFromStop' = routesFromStopInLists stop routeLists
             routesFromStop'' = routeFromStopInNestedRoutes stop routes'
         in Left $ displayRoutesFromStop (routesFromStop' ++ routesFromStop'') stop
-
-
+    
 
     -- Helper function to extract all stops from a RouteTree
     nodeStopsFromTree :: RouteTree -> [Stop]
@@ -563,4 +569,3 @@ module Lib2 (
 
     displayStopName :: Stop -> String
     displayStopName = show
-

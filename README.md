@@ -59,6 +59,42 @@ cd fp_julius/src
 stack runghc stateTransitionWalkthrough.hs
 ```
 
+### Lab3 comments
+
+Implemented loading and saving state from a file.
+
+### Persistence commands
+
+Persistence commands have been added to save and load state from a file
+
+``load`` Loads the statement batch that is saved in the saved.txt file.
+
+
+``save`` Saves the current state as a statement batch in the saved.txt file.
+
+### Other commands
+
+Batch querying has been added.
+To do so:
+```
+:paste
+BEGIN
+query;
+query;
+query;
+END
+
+or 
+
+BEGIN query;query;query; END
+```
+
+This executes a sequence of queries atomically using Software Transactional Memory (STM), changing the state. This is defined in Lib3.hs state transitions.
+
+### Property testing
+
+Property tests have been added to test rendering and parsing statement batches (state marshalling). Arbitrary instance types have been added to be able to property test.
+
 ## BNF
 The grammar for this domain is provided in fp_julius/grammar.txt.
 

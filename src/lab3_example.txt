@@ -1,0 +1,23 @@
+Welcome! Press [TAB] for auto completion, type ':paste' for multiline input
+>>> :paste
+-- Entering multi-line mode. Press <Ctrl-D> to finish.
+| BEGIN
+| list-create list;
+| route-create r1;
+| route-create r2;
+| route-create r3;
+| route-create r4;
+| route-add-route <r1{}> <r2{}>;
+| route-add-route <r3{}> <r4{}>;
+| list-add list <r1{<r2{}>}>;
+| END
+| 
+State {routeTreeLists = [(StringName "list",[Node (NodeRoute {nodeRouteId = StringName "r1", nodeStops = []}) [Node (NodeRoute {nodeRouteId = StringName "r2", nodeStops = []}) []]])], routes = [Route {routeId' = StringName "r3", stops' = [], nestedRoutes' = [Route {routeId' = StringName "r4", stops' = [], nestedRoutes' = []}]}], stops = []}
+>>> save
+State {routeTreeLists = [(StringName "list",[Node (NodeRoute {nodeRouteId = StringName "r1", nodeStops = []}) [Node (NodeRoute {nodeRouteId = StringName "r2", nodeStops = []}) []]])], routes = [Route {routeId' = StringName "r3", stops' = [], nestedRoutes' = [Route {routeId' = StringName "r4", stops' = [], nestedRoutes' = []}]}], stops = []}
+>>> 
+[1]+  Stopped                 stack run fp2024-three
+root@d5cfed85b082:/workspaces/fp_julius# stack run fp2024-three
+Welcome! Press [TAB] for auto completion, type ':paste' for multiline input
+>>> load
+State {routeTreeLists = [(StringName "list",[Node (NodeRoute {nodeRouteId = StringName "r1", nodeStops = []}) [Node (NodeRoute {nodeRouteId = StringName "r2", nodeStops = []}) []]])], routes = [Route {routeId' = StringName "r3", stops' = [], nestedRoutes' = [Route {routeId' = StringName "r4", stops' = [], nestedRoutes' = []}]}], stops = []}

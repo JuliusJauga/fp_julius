@@ -1,3 +1,29 @@
+<batch> ::= 'BEGIN' <commands_list> 'END'
+
+<commands_list> ::= <commands> ';' <commands_list> | <commands>
+<compound_query> ::= <commands> ';' <commands>
+
+<load_commands> ::= 'load'
+<save_commands> ::= 'save'
+
+<command> ::= 
+    <list_create> |
+    <list_add> |
+    <list_get> |
+    <list_remove> |
+    <route_create> |
+    <route_get> |
+    <route_add_route> |
+    <route_remove> |
+    <route_add_stop> |
+    <route_remove_stop> |
+    <stop_create> |
+    <stop_delete> |
+    <routes_from_stop> |
+    <load_commands> |
+    <save_commands>
+
+
 <list_create> ::= "list-create " <name>
 <list_add> ::= "list-add " <name> <route>
 <list_get> ::= "list-get " <name>

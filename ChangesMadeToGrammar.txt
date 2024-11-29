@@ -19,4 +19,11 @@ The following changes were made to grammar:
         1. <letter>     
         2. <digit>      
         3. <word>       
-        4. <number>     
+        4. <number>   
+
+    6. Added components.    (Main building blocks for Lab3)
+        1. <command>
+        2. <compound_query>
+        3. <commands_list>
+        4. <load_commands>
+        5. <save_commands>  

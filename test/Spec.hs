@@ -1,212 +1,129 @@
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE TypeApplications #-}
 import Test.Tasty ( TestTree, defaultMain, testGroup )
 import Test.Tasty.HUnit ( testCase, (@?=) )
+import Test.Tasty.QuickCheck as QC
 
-import Lib2 qualified (
-        Stop(..),
-        Route(..),
-        Query(..),
-        State(..),
-        RouteTree(..),
-        NodeRoute(..),
-        Name(..),
-        parseQuery,
-        parseRouteSystem,
-        stateTransition,
-        initialState,
-        singletonRoute,
-        insertRoute,
-        insertNestedRoutes,
-        rebuildRoute,
-        nodeStopsFromTree,
-        parseListAdd,
-        parseListCreate,
-        parseListGet,
-        parseListRemove,
-        parseRouteCreate,
-        parseRouteGet,
-        parseRouteAddRoute,
-        parseRouteRemove,
-        parseStopCreate,
-        parseStopDelete,
-        parseStop,
-        parseRouteList,
-        parseStopList,
-        parseRoute
-        )
+import Data.List
+import Data.Ord
+
+import Lib1 qualified
+import Lib2 qualified
+import Lib3 qualified
+import Test.QuickCheck (Arbitrary, arbitrary, elements, listOf1, Gen)
+
+import Control.Concurrent.STM (newTVarIO, readTVarIO, TVar)
+import Control.Concurrent (newChan, Chan)
+import Control.Monad.IO.Class (liftIO)
+
 
 main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [unitTests]
+tests = testGroup "Tests" [propertyTests]
 
-unitTests :: TestTree
-unitTests = testGroup "Lib2 tests" [
-    -- Parsing Tests
-    testCase "parseStop parses a valid stop" $
-        Lib2.parseStop "(Stop1)" @?= Right (Lib2.Stop (Lib2.StringName "Stop1"), ""),
+instance Arbitrary Lib2.Name where
+    arbitrary = do
+        n <- choose (1, 100) :: Gen Int
+        s <- listOf1 $ elements ['a'..'z']
+        elements [Lib2.StringName s]
 
-    testCase "parseStop fails on invalid stop" $
-        Lib2.parseStop "Stop1)" @?= Left "Expected '('",
+instance Arbitrary Lib2.Query where
+    arbitrary = do
+        name <- arbitrary
+        route <- arbitrary
+        stop <- arbitrary
+        oneof [ pure $ Lib2.ListCreate name
+              , pure $ Lib2.ListAdd name route
+              , pure $ Lib2.ListGet name
+              , pure $ Lib2.ListRemove name
+              , pure $ Lib2.RouteCreate name
+              , pure $ Lib2.RouteGet name
+              , pure $ Lib2.RouteAddRoute route route
+              , pure $ Lib2.RouteAddStop name stop
+              , pure $ Lib2.RouteRemoveStop name stop
+              , pure $ Lib2.RouteRemove name
+              , pure $ Lib2.StopCreate name
+              , pure $ Lib2.StopDelete name
+              , pure $ Lib2.RoutesFromStop stop
+              ]
 
-    testCase "parseStopList parses a valid stop list" $
-        Lib2.parseStopList "(Stop1)(Stop2)" @?= Right ([Lib2.Stop (Lib2.StringName "Stop1"), Lib2.Stop (Lib2.StringName "Stop2")], ""),
+instance Arbitrary Lib2.State where
+    arbitrary = do
+        routeTreeLists <- resize 5 arbitrary
+        routes <- resize 5 arbitrary
+        stops <- resize 5 arbitrary
+        pure $ Lib2.State routeTreeLists routes stops
 
-    testCase "parseStopList fails on invalid stop list" $
-        Lib2.parseStopList "(Stop1)Stop2)" @?= Right ([Lib2.Stop (Lib2.StringName "Stop1")], "Stop2)"),
+instance Arbitrary Lib2.Route where
+    arbitrary = do
+        routeId' <- arbitrary
+        stops' <- resize 5 arbitrary
+        nestedRoutes' <- resize 5 arbitrary
+        pure $ Lib2.Route routeId' stops' nestedRoutes'
 
-    testCase "parseRoute parses a valid route" $
-        Lib2.parseRoute "<Route1{(Stop1)(Stop2)}>" @?= Right (Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1"), Lib2.Stop (Lib2.StringName "Stop2")] [], ""),
+instance Arbitrary Lib2.Stop where
+    arbitrary = do
+        stopId' <- arbitrary
+        pure $ Lib2.Stop stopId'
 
-    testCase "parseRoute fails on invalid route" $
-        Lib2.parseRoute "Route1{(Stop1)(Stop2)}>" @?= Left "Expected '<'",
+instance Arbitrary Lib2.RouteTree where
+    arbitrary = do
+        nodeRoute <- arbitrary
+        routeTrees <- resize 5 arbitrary
+        oneof [ pure Lib2.EmptyTree
+              , pure $ Lib2.Node nodeRoute routeTrees
+              ]
 
-    testCase "parseRouteList parses a valid route list" $
-        Lib2.parseRouteList "<Route1{(Stop1)(Stop2)}><Route2{(Stop3)}><Route3{(Stop4)(Stop5)}>" @?= Right ([Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1"), Lib2.Stop (Lib2.StringName "Stop2")] [], Lib2.Route (Lib2.StringName "Route2") [Lib2.Stop (Lib2.StringName "Stop3")] [], Lib2.Route (Lib2.StringName "Route3") [Lib2.Stop (Lib2.StringName "Stop4"), Lib2.Stop (Lib2.StringName "Stop5")] []], ""),
+instance Arbitrary Lib2.NodeRoute where
+    arbitrary = do
+        nodeRouteId <- arbitrary
+        nodeStops <- resize 5 arbitrary
+        pure $ Lib2.NodeRoute nodeRouteId nodeStops
 
-    testCase "parseRouteSystem parses a valid route system" $
-        Lib2.parseRouteSystem "[<Route1{(Stop1)(Stop2)}><Route2{(Stop3)}><Route3{(Stop4)(Stop5)}>]" @?= Right ([Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1"), Lib2.Stop (Lib2.StringName "Stop2")] [], Lib2.Route (Lib2.StringName "Route2") [Lib2.Stop (Lib2.StringName "Stop3")] [], Lib2.Route (Lib2.StringName "Route3") [Lib2.Stop (Lib2.StringName "Stop4"), Lib2.Stop (Lib2.StringName "Stop5")] []], ""),
+-- Lib3 statements
+instance Arbitrary Lib3.Statements where
+ arbitrary = frequency
+  [ (3, Lib3.Single <$> arbitrary) 
+  , (1, Lib3.Batch <$> resize 5 (listOf1 (arbitrary @Lib2.Query)))
+  ]
 
-    testCase "parseRouteSystem fails on invalid route system" $
-        Lib2.parseRouteSystem "[<Route1{(Stop1)(Stop2)}><Route2{(Stop3)}Route3{(Stop4)(Stop5)}>]" @?= Left "Expected ']'",
 
-    testCase "parseListCreate parses a valid list-create query" $
-        Lib2.parseListCreate "list-create List1" @?= Right (Lib2.ListCreate (Lib2.StringName "List1"), ""),
+propertyTests :: TestTree
+propertyTests =
+    testGroup "Property tests"
+    [ QC.testProperty "parseStatements . renderStatements == Right query" $  -- Test for statement integrity
+    \query -> 
+        let 
+        rendered = Lib3.renderStatements query 
+        parsed = Lib3.parseStatements rendered 
+        in 
+        counterexample ("Original query: " ++ show query ++ 
+                        "\nRendered: " ++ rendered ++ 
+                        "\nParsed result: " ++ show parsed) $ 
+            case parsed of 
+            Right (parsedQuery, "") -> query == parsedQuery 
+            _ -> False
+        , QC.testProperty "Parsing invalid statements returns an error" $
+    \invalidInput ->
+        case Lib3.parseStatements invalidInput of
+        Left _ -> True  -- Should return an error for invalid input
+        _ -> False
 
-    testCase "parseListCreate fails on invalid list-create query" $
-        Lib2.parseListCreate "list-createList1" @?= Left "Expected 'list-create '",
+    , QC.testProperty "Empty batch statements can be parsed" $
+    Lib3.parseStatements (Lib3.renderStatements (Lib3.Batch [])) 
+        === Right (Lib3.Batch [], "")
 
-    testCase "parseListAdd parses a valid list-add query" $
-        Lib2.parseListAdd "list-add List1 <Route1{(Stop1)(Stop2)}>" @?= Right (Lib2.ListAdd (Lib2.StringName "List1") (Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1"), Lib2.Stop (Lib2.StringName "Stop2")] []), ""),
+    , QC.testProperty "Large batch statements maintain integrity" $
+    \largeBatch ->
+        let 
+        rendered = Lib3.renderStatements (Lib3.Batch largeBatch)
+        parsed = Lib3.parseStatements rendered
+        in
+        case parsed of
+            Right (Lib3.Batch parsedBatch, "") -> 
+                length parsedBatch == length largeBatch
+            _ -> False
 
-    testCase "parseListAdd fails on invalid list-add query" $
-        Lib2.parseListAdd "list-add List1 Route1{(Stop1)(Stop2)}>" @?= Left "Expected '<'",
-
-    testCase "parseListGet parses a valid list-get query" $
-        Lib2.parseListGet "list-get List1" @?= Right (Lib2.ListGet (Lib2.StringName "List1"), ""),
-
-    testCase "parseListGet fails on invalid list-get query" $
-        Lib2.parseListGet "list-getList1" @?= Left "Expected 'list-get '",
-
-    testCase "parseListRemove parses a valid list-remove query" $
-        Lib2.parseListRemove "list-remove List1" @?= Right (Lib2.ListRemove (Lib2.StringName "List1"), ""),
-
-    testCase "parseListRemove fails on invalid list-remove query" $
-        Lib2.parseListRemove "list-removeList1" @?= Left "Expected 'list-remove '",
-
-    testCase "parseRouteCreate parses a valid route-create query" $
-        Lib2.parseRouteCreate "route-create Route1" @?= Right (Lib2.RouteCreate (Lib2.StringName "Route1"), ""),
-
-    testCase "parseRouteCreate fails on invalid route-create query" $
-        Lib2.parseRouteCreate "route-createRoute1" @?= Left "Expected 'route-create '",
-
-    testCase "parseRouteGet parses a valid route-get query" $
-        Lib2.parseRouteGet "route-get Route1" @?= Right (Lib2.RouteGet (Lib2.StringName "Route1"), ""),
-
-    testCase "parseRouteGet fails on invalid route-get query" $
-        Lib2.parseRouteGet "route-getRoute1" @?= Left "Expected 'route-get '",
-
-    testCase "parseRouteAddRoute parses a valid route-add-route query" $
-        Lib2.parseRouteAddRoute "route-add-route <Route1{(Stop1)(Stop2)}> <Route2{(Stop3)}>" @?= Right (Lib2.RouteAddRoute (Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1"), Lib2.Stop (Lib2.StringName "Stop2")] []) (Lib2.Route (Lib2.StringName "Route2") [Lib2.Stop (Lib2.StringName "Stop3")] []), ""),
-
-    testCase "parseRouteAddRoute fails on invalid route-add-route query" $
-        Lib2.parseRouteAddRoute "route-add-route Route1{(Stop1)(Stop2)}> <Route2{(Stop3)}>" @?= Left "Expected '<'",
-
-    testCase "parseRouteRemove parses a valid route-remove query" $
-        Lib2.parseRouteRemove "route-remove Route1" @?= Right (Lib2.RouteRemove (Lib2.StringName "Route1"), ""),
-
-    testCase "parseRouteRemove fails on invalid route-remove query" $
-        Lib2.parseRouteRemove "route-removeRoute1" @?= Left "Expected 'route-remove '",
-
-    testCase "parseStopCreate parses a valid stop-create query" $
-        Lib2.parseStopCreate "stop-create Stop1" @?= Right (Lib2.StopCreate (Lib2.StringName "Stop1"), ""),
-
-    testCase "parseStopCreate fails on invalid stop-create query" $
-        Lib2.parseStopCreate "stop-createStop1" @?= Left "Expected 'stop-create '",
-
-    testCase "parseStopDelete parses a valid stop-delete query" $
-        Lib2.parseStopDelete "stop-delete Stop1" @?= Right (Lib2.StopDelete (Lib2.StringName "Stop1"), ""),
-
-    testCase "parseStopDelete fails on invalid stop-delete query" $
-        Lib2.parseStopDelete "stop-deleteStop1" @?= Left "Expected 'stop-delete '",
-    
-    -- State Transition Tests
-    testCase "stateTransition handles ListCreate" $
-        Lib2.stateTransition Lib2.initialState (Lib2.ListCreate (Lib2.StringName "List1")) @?= Lib2.State [(Lib2.StringName "List1", [])] [] [],
-
-    testCase "stateTransition handles ListAdd" $
-        Lib2.stateTransition (Lib2.State [(Lib2.StringName "List1", [])] [Lib2.Route (Lib2.StringName "Route1") [] []] []) (Lib2.ListAdd (Lib2.StringName "List1") (Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1"), Lib2.Stop (Lib2.StringName "Stop2")] [])) @?= Lib2.State [(Lib2.StringName "List1", [Lib2.Node (Lib2.NodeRoute (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1"), Lib2.Stop (Lib2.StringName "Stop2")]) []])] [] [],
-
-    testCase "stateTransition handles ListRemove" $
-        Lib2.stateTransition (Lib2.State [(Lib2.StringName "List1", [Lib2.Node (Lib2.NodeRoute (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1"), Lib2.Stop (Lib2.StringName "Stop2")]) []])] [Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1"), Lib2.Stop (Lib2.StringName "Stop2")] []] []) (Lib2.ListRemove (Lib2.StringName "List1")) @?= Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1"), Lib2.Stop (Lib2.StringName "Stop2")] []] [],
-
-    testCase "stateTransition handles RouteCreate" $
-        Lib2.stateTransition Lib2.initialState (Lib2.RouteCreate (Lib2.StringName "Route1")) @?= Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [] []] [],
-
-    testCase "stateTransition handles RouteAddRoute" $
-        Lib2.stateTransition (Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [] [], Lib2.Route (Lib2.StringName "Route2") [] []] []) (Lib2.RouteAddRoute (Lib2.Route (Lib2.StringName "Route1") [] []) (Lib2.Route (Lib2.StringName "Route2") [] [])) @?= Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [] [Lib2.Route (Lib2.StringName "Route2") [] []]] [],
-
-    testCase "stateTransition handles RouteRemove" $
-        Lib2.stateTransition (Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [] [], Lib2.Route (Lib2.StringName "Route2") [] []] []) (Lib2.RouteRemove (Lib2.StringName "Route1")) @?= Lib2.State [] [Lib2.Route (Lib2.StringName "Route2") [] []] [],
-
-    testCase "stateTransition handles RouteAddStop" $
-        Lib2.stateTransition (Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [] []] []) (Lib2.RouteAddStop (Lib2.StringName "Route1") (Lib2.Stop (Lib2.StringName "Stop1"))) @?= Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1")] []] [],
-
-    testCase "stateTransition handles RouteRemoveStop" $
-        Lib2.stateTransition (Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1")] []] []) (Lib2.RouteRemoveStop (Lib2.StringName "Route1") (Lib2.Stop (Lib2.StringName "Stop1"))) @?= Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [] []] [Lib2.Stop (Lib2.StringName "Stop1")],
-
-    testCase "stateTransition handles StopCreate" $
-        Lib2.stateTransition Lib2.initialState (Lib2.StopCreate (Lib2.StringName "Stop1")) @?= Lib2.State [] [] [Lib2.Stop (Lib2.StringName "Stop1")],
-
-    testCase "stateTransition handles StopDelete" $
-        Lib2.stateTransition (Lib2.State [] [] [Lib2.Stop (Lib2.StringName "Stop1")]) (Lib2.StopDelete (Lib2.StringName "Stop1")) @?= Lib2.State [] [] [],
-
-    -- Additional State Transition Tests
-    testCase "stateTransition handles ListAdd with non-existing list" $
-        Lib2.stateTransition Lib2.initialState (Lib2.ListAdd (Lib2.StringName "NonExistingList") (Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1")] [])) @?= Lib2.initialState,
-
-    testCase "stateTransition handles RouteAddRoute with non-existing parent route" $
-        Lib2.stateTransition Lib2.initialState (Lib2.RouteAddRoute (Lib2.Route (Lib2.StringName "NonExistingRoute") [] []) (Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1")] [])) @?= Lib2.initialState,
-
-    testCase "stateTransition handles RouteAddStop with non-existing route" $
-        Lib2.stateTransition Lib2.initialState (Lib2.RouteAddStop (Lib2.StringName "NonExistingRoute") (Lib2.Stop (Lib2.StringName "Stop1"))) @?= Lib2.initialState,
-
-    testCase "stateTransition handles RouteRemoveStop with non-existing route" $
-        Lib2.stateTransition Lib2.initialState (Lib2.RouteRemoveStop (Lib2.StringName "NonExistingRoute") (Lib2.Stop (Lib2.StringName "Stop1"))) @?= Lib2.initialState,
-
-    testCase "stateTransition handles StopDelete with non-existing stop" $
-        Lib2.stateTransition Lib2.initialState (Lib2.StopDelete (Lib2.StringName "NonExistingStop")) @?= Lib2.initialState,
-    
-    -- Higher Recursion Tests
-    testCase "stateTransition handles nested RouteAddRoute" $
-        let initialState = Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [] [], Lib2.Route (Lib2.StringName "Route2") [] [], Lib2.Route (Lib2.StringName "Route3") [] []] []
-            expectedState = Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [] [Lib2.Route (Lib2.StringName "Route2") [] [Lib2.Route (Lib2.StringName "Route3") [] []]]] []
-        in Lib2.stateTransition (Lib2.stateTransition initialState (Lib2.RouteAddRoute (Lib2.Route (Lib2.StringName "Route1") [] []) (Lib2.Route (Lib2.StringName "Route2") [] []))) (Lib2.RouteAddRoute (Lib2.Route (Lib2.StringName "Route2") [] []) (Lib2.Route (Lib2.StringName "Route3") [] [])) @?= expectedState,
-
-    testCase "stateTransition handles nested ListAdd" $
-        let initialState = Lib2.State [(Lib2.StringName "List1", [])] [Lib2.Route (Lib2.StringName "Route1") [] [Lib2.Route (Lib2.StringName "Route2") [] [Lib2.Route (Lib2.StringName "Route3") [] []]]] []
-            expectedState = Lib2.State [(Lib2.StringName "List1", [Lib2.Node (Lib2.NodeRoute (Lib2.StringName "Route1") []) [Lib2.Node (Lib2.NodeRoute (Lib2.StringName "Route2") []) [Lib2.Node (Lib2.NodeRoute (Lib2.StringName "Route3") []) []]]])] [] []
-        in Lib2.stateTransition initialState (Lib2.ListAdd (Lib2.StringName "List1") (Lib2.Route (Lib2.StringName "Route1") [] [Lib2.Route (Lib2.StringName "Route2") [] [Lib2.Route (Lib2.StringName "Route3") [] []]])) @?= expectedState,
-
-    testCase "stateTransition handles ListRemove with nested routes" $
-        let initialState = Lib2.State [(Lib2.StringName "List1", [Lib2.Node (Lib2.NodeRoute (Lib2.StringName "Route1") []) [Lib2.Node (Lib2.NodeRoute (Lib2.StringName "Route2") []) [Lib2.Node (Lib2.NodeRoute (Lib2.StringName "Route3") []) []]]])] [Lib2.Route (Lib2.StringName "Route1") [] [Lib2.Route (Lib2.StringName "Route2") [] [Lib2.Route (Lib2.StringName "Route3") [] []]]] []
-            expectedState = Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [] [Lib2.Route (Lib2.StringName "Route2") [] [Lib2.Route (Lib2.StringName "Route3") [] []]]] []
-        in Lib2.stateTransition initialState (Lib2.ListRemove (Lib2.StringName "List1")) @?= expectedState,
-    
-    testCase "stateTransition handles nested RouteAddRoute with stops" $
-        let initialState = Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1")] [], Lib2.Route (Lib2.StringName "Route2") [Lib2.Stop (Lib2.StringName "Stop2")] [], Lib2.Route (Lib2.StringName "Route3") [Lib2.Stop (Lib2.StringName "Stop3")] []] []
-            expectedState = Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1")] [Lib2.Route (Lib2.StringName "Route2") [Lib2.Stop (Lib2.StringName "Stop2")] [Lib2.Route (Lib2.StringName "Route3") [Lib2.Stop (Lib2.StringName "Stop3")] []]]] []
-        in Lib2.stateTransition (Lib2.stateTransition initialState (Lib2.RouteAddRoute (Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1")] []) (Lib2.Route (Lib2.StringName "Route2") [Lib2.Stop (Lib2.StringName "Stop2")] []))) (Lib2.RouteAddRoute (Lib2.Route (Lib2.StringName "Route2") [Lib2.Stop (Lib2.StringName "Stop2")] []) (Lib2.Route (Lib2.StringName "Route3") [Lib2.Stop (Lib2.StringName "Stop3")] [])) @?= expectedState,
-
-    testCase "stateTransition handles nested ListAdd with stops" $
-        let initialState = Lib2.State [(Lib2.StringName "List1", [])] [Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1")] [Lib2.Route (Lib2.StringName "Route2") [Lib2.Stop (Lib2.StringName "Stop2")] [Lib2.Route (Lib2.StringName "Route3") [Lib2.Stop (Lib2.StringName "Stop3")] []]]] []
-            expectedState = Lib2.State [(Lib2.StringName "List1", [Lib2.Node (Lib2.NodeRoute (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1")]) [Lib2.Node (Lib2.NodeRoute (Lib2.StringName "Route2") [Lib2.Stop (Lib2.StringName "Stop2")]) [Lib2.Node (Lib2.NodeRoute (Lib2.StringName "Route3") [Lib2.Stop (Lib2.StringName "Stop3")]) []]]])] [] []
-        in Lib2.stateTransition initialState (Lib2.ListAdd (Lib2.StringName "List1") (Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1")] [Lib2.Route (Lib2.StringName "Route2") [Lib2.Stop (Lib2.StringName "Stop2")] [Lib2.Route (Lib2.StringName "Route3") [Lib2.Stop (Lib2.StringName "Stop3")] []]])) @?= expectedState,
-
-    testCase "stateTransition handles ListRemove with nested routes and stops" $
-        let initialState = Lib2.State [(Lib2.StringName "List1", [Lib2.Node (Lib2.NodeRoute (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1")]) [Lib2.Node (Lib2.NodeRoute (Lib2.StringName "Route2") [Lib2.Stop (Lib2.StringName "Stop2")]) [Lib2.Node (Lib2.NodeRoute (Lib2.StringName "Route3") [Lib2.Stop (Lib2.StringName "Stop3")]) []]]])] [Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1")] [Lib2.Route (Lib2.StringName "Route2") [Lib2.Stop (Lib2.StringName "Stop2")] [Lib2.Route (Lib2.StringName "Route3") [Lib2.Stop (Lib2.StringName "Stop3")] []]]] []
-            expectedState = Lib2.State [] [Lib2.Route (Lib2.StringName "Route1") [Lib2.Stop (Lib2.StringName "Stop1")] [Lib2.Route (Lib2.StringName "Route2") [Lib2.Stop (Lib2.StringName "Stop2")] [Lib2.Route (Lib2.StringName "Route3") [Lib2.Stop (Lib2.StringName "Stop3")] []]]] []
-        in Lib2.stateTransition initialState (Lib2.ListRemove (Lib2.StringName "List1")) @?= expectedState
-    
     ]

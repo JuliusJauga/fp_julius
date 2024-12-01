@@ -1,4 +1,6 @@
 {-# LANGUAGE InstanceSigs #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use lambda-case" #-}
 module Lib3
     ( stateTransition,
     StorageOp (..),
@@ -13,12 +15,14 @@ module Lib3
 
 import Control.Concurrent ( Chan , readChan, writeChan, newChan )
 import Control.Concurrent.STM(TVar, atomically, readTVarIO, readTVar, writeTVar)
-import Data.List (isPrefixOf, isSuffixOf, notElem, (\\), intercalate, find, delete, partition)
+import Data.List (isPrefixOf, isSuffixOf, notElem, (\\), intercalate, find, delete, partition, nubBy)
 import qualified Lib2
 import Data.Char (isSpace)
 import Control.Exception (try, SomeException)
 import Debug.Trace
 import Data.Either (partitionEithers)
+import Lib2 (Stop(stopId'))
+import GHC.Read (list)
 
 -- instance Show Lib2.Query where
 --     show = renQuery 
@@ -74,7 +78,7 @@ parseCommand input
     | otherwise = case Lib2.parseQuery (trim input) of
         Left err -> Left err
         Right (query, rest) -> Right (StatementCommand (Single query), rest)
-        
+
 -- | Parses Statement.
 -- Must be used in parseCommand.
 -- Reuse Lib2 as much as you can.
@@ -135,18 +139,45 @@ marshallState :: Lib2.State -> Statements
 marshallState (Lib2.State routeTreeLists routes stops) =
     let stopQueries = map stopToQuery stops
         routeQueries = concatMap routeToQueries routes
-        listQueries = concatMap listToQueries routeTreeLists
-    in Batch (stopQueries ++ routeQueries ++ listQueries)
+        listQueriesWithStopCreate = concatMap listToQueries routeTreeLists
+        stopQueries' = cancelDuplicateStopCreateQueries (stopQueries ++ listQueriesWithStopCreate)
+        listQueries = filter (\q -> case q of 
+            Lib2.StopCreate _ -> False
+            _ -> True) listQueriesWithStopCreate
+    in Batch (stopQueries' ++ routeQueries ++ listQueries)
+
 
 -- Converts a Stop into a StopCreate query
 stopToQuery :: Lib2.Stop -> Lib2.Query
 stopToQuery (Lib2.Stop stopId) = Lib2.StopCreate stopId
 
+
+cancelDuplicateStopCreateQueries :: [Lib2.Query] -> [Lib2.Query]
+cancelDuplicateStopCreateQueries queries =
+    let
+        -- A helper function to filter unique `StopCreate` queries
+        removeDuplicateStopCreates :: [Lib2.Query] -> [Lib2.Query] -> [Lib2.Query]
+        removeDuplicateStopCreates [] _ = []
+        removeDuplicateStopCreates (q:qs) seen = case q of
+            Lib2.StopCreate stopId ->
+                if Lib2.StopCreate stopId `elem` seen
+                    then removeDuplicateStopCreates qs seen
+                    else q : removeDuplicateStopCreates qs (Lib2.StopCreate stopId : seen)
+            _ -> removeDuplicateStopCreates qs seen
+
+        -- Extract `StopCreate` queries and deduplicate them
+        stopCreateQueries = filter (\q -> case q of
+            Lib2.StopCreate _ -> True
+            _ -> False) queries
+        uniqueStopCreates = removeDuplicateStopCreates stopCreateQueries []   
+    in uniqueStopCreates
+
+
 -- Converts a Route into a series of queries, including RouteAddStop queries
 routeToQueries :: Lib2.Route -> [Lib2.Query]
 routeToQueries (Lib2.Route routeId routeStops nestedRoutes) =
     let createRouteQuery = Lib2.RouteCreate routeId
-        addStopQueries = map (Lib2.RouteAddStop routeId) routeStops  -- Adding stops to the route
+        addStopQueries = map (Lib2.RouteAddStop routeId . Lib2.stopId') routeStops  -- Adding stops to the route
         addNestedRouteQueries = concatMap routeToQueriesNested nestedRoutes  -- renerate queries for nested routes
         addRouteAddRouteQueries = concatMap (routeAddRouteQueries routeId) nestedRoutes  -- renerate queries for adding nested routes
     in createRouteQuery : (addStopQueries ++ addNestedRouteQueries ++ addRouteAddRouteQueries)
@@ -155,52 +186,111 @@ routeToQueries (Lib2.Route routeId routeStops nestedRoutes) =
 routeToQueriesNested :: Lib2.Route -> [Lib2.Query]
 routeToQueriesNested (Lib2.Route nestedRouteId nestedRouteStops nestedNestedRoutes) =
     let createNestedRouteQuery = Lib2.RouteCreate nestedRouteId
-        addStopQueries = map (Lib2.RouteAddStop nestedRouteId) nestedRouteStops  -- Adding stops to the nested route
+        addStopQueries = map (Lib2.RouteAddStop nestedRouteId . Lib2.stopId') nestedRouteStops  -- Adding stops to the nested route
         addNestedRouteQueries = concatMap routeToQueriesNested nestedNestedRoutes  -- Recurse for any further nested routes
     in createNestedRouteQuery : (addStopQueries ++ addNestedRouteQueries)
 
 -- renerates queries for adding a child route to a parent route
 routeAddRouteQueries :: Lib2.Name -> Lib2.Route -> [Lib2.Query]
 routeAddRouteQueries parentId childRoute =
-    let addRouteQuery = [Lib2.RouteAddRoute (Lib2.Route parentId [] []) childRoute]
+    let addRouteQuery = [Lib2.RouteAddRoute parentId (Lib2.routeId' childRoute)]
     in addRouteQuery
 
--- Converts a RouteTreeList to a series of queries
 listToQueries :: (Lib2.Name, [Lib2.RouteTree]) -> [Lib2.Query]
 listToQueries (listName, trees) =
     let createListQuery = Lib2.ListCreate listName
         treeQueries = concatMap (treeToQueriesWithListAdd listName) trees
     in createListQuery : treeQueries
 
--- Converts a RouteTree to queries, ensuring it includes a ListAdd query for the list
 treeToQueriesWithListAdd :: Lib2.Name -> Lib2.RouteTree -> [Lib2.Query]
 treeToQueriesWithListAdd listName tree =
     let routeCreateQueries = treeToCreateQueries tree
-        addRouteQueries = routeAddRouteQueriesFromTree tree
-        listAddQuery = Lib2.ListAdd listName (routeTreeToRoute tree)
-    in routeCreateQueries ++ addRouteQueries ++ [listAddQuery]
+        listAddQuery = Lib2.ListAdd listName (Lib2.routeId' (Lib2.routeTreeToRoute tree))
+    in routeCreateQueries ++ [listAddQuery]
 
--- Converts a RouteTree to the queries to create the route, ensuring correct order
 treeToCreateQueries :: Lib2.RouteTree -> [Lib2.Query]
 treeToCreateQueries Lib2.EmptyTree = []
 treeToCreateQueries (Lib2.Node (Lib2.NodeRoute routeId routeStops) childRoutes) =
-    let createRouteQuery = Lib2.RouteCreate routeId
-        addStopQueries = map (Lib2.RouteAddStop routeId) routeStops
-        childRouteQueries = concatMap treeToCreateQueries childRoutes
-    in createRouteQuery : (addStopQueries ++ childRouteQueries)
+    let createStopsQueries = map stopToQuery routeStops
+        node = (Lib2.Node (Lib2.NodeRoute routeId routeStops) childRoutes)
+        route = Lib2.routeTreeToRoute node
+        createRouteQueries = routeToQueries route
+    in createStopsQueries ++ createRouteQueries
 
--- Converts a RouteTree to a Route representation
-routeTreeToRoute :: Lib2.RouteTree -> Lib2.Route
-routeTreeToRoute (Lib2.Node (Lib2.NodeRoute routeId routeStops) childRoutes) =
-    Lib2.Route routeId routeStops (map routeTreeToRoute childRoutes)
-routeTreeToRoute Lib2.EmptyTree = error "Cannot convert an empty tree to a route"
 
--- Ensure that route-add-route queries are renerated between route creations
-routeAddRouteQueriesFromTree :: Lib2.RouteTree -> [Lib2.Query]
-routeAddRouteQueriesFromTree (Lib2.Node (Lib2.NodeRoute routeId _) childRoutes) =
-    concatMap (\(Lib2.Node (Lib2.NodeRoute childRouteId _) _) -> 
-        [Lib2.RouteAddRoute (Lib2.Route routeId [] []) (Lib2.Route childRouteId [] [])]) childRoutes
-routeAddRouteQueriesFromTree _ = []
+
+
+
+-- marshallState :: Lib2.State -> Statements
+-- marshallState (Lib2.State routeTreeLists routes stops) =
+--     let stopQueries = map stopToQuery stops
+--         routeQueries = concatMap routeToQueries routes
+--         listQueries = concatMap listToQueries routeTreeLists
+--     in Batch (stopQueries ++ routeQueries ++ listQueries)
+
+-- -- Converts a Stop into a StopCreate query
+-- stopToQuery :: Lib2.Stop -> Lib2.Query
+-- stopToQuery (Lib2.Stop stopId) = Lib2.StopCreate stopId
+
+-- -- Converts a Route into a series of queries, including RouteAddStop queries
+-- routeToQueries :: Lib2.Route -> [Lib2.Query]
+-- routeToQueries (Lib2.Route routeId routeStops nestedRoutes) =
+--     let createRouteQuery = Lib2.RouteCreate routeId
+--         addStopQueries = map (Lib2.RouteAddStop routeId) routeStops  -- Adding stops to the route
+--         addNestedRouteQueries = concatMap routeToQueriesNested nestedRoutes  -- renerate queries for nested routes
+--         addRouteAddRouteQueries = concatMap (routeAddRouteQueries routeId) nestedRoutes  -- renerate queries for adding nested routes
+--     in createRouteQuery : (addStopQueries ++ addNestedRouteQueries ++ addRouteAddRouteQueries)
+
+-- -- Helper function to renerate queries for nested routes
+-- routeToQueriesNested :: Lib2.Route -> [Lib2.Query]
+-- routeToQueriesNested (Lib2.Route nestedRouteId nestedRouteStops nestedNestedRoutes) =
+--     let createNestedRouteQuery = Lib2.RouteCreate nestedRouteId
+--         addStopQueries = map (Lib2.RouteAddStop nestedRouteId) nestedRouteStops  -- Adding stops to the nested route
+--         addNestedRouteQueries = concatMap routeToQueriesNested nestedNestedRoutes  -- Recurse for any further nested routes
+--     in createNestedRouteQuery : (addStopQueries ++ addNestedRouteQueries)
+
+-- renerates queries for adding a child route to a parent route
+-- routeAddRouteQueries :: Lib2.Name -> Lib2.Route -> [Lib2.Query]
+-- routeAddRouteQueries parentId childRoute =
+--     let addRouteQuery = [Lib2.RouteAddRoute (Lib2.Route parentId [] []) childRoute]
+--     in addRouteQuery
+
+-- -- Converts a RouteTreeList to a series of queries
+-- listToQueries :: (Lib2.Name, [Lib2.RouteTree]) -> [Lib2.Query]
+-- listToQueries (listName, trees) =
+--     let createListQuery = Lib2.ListCreate listName
+--         treeQueries = concatMap (treeToQueriesWithListAdd listName) trees
+--     in createListQuery : treeQueries
+
+-- -- Converts a RouteTree to queries, ensuring it includes a ListAdd query for the list
+-- treeToQueriesWithListAdd :: Lib2.Name -> Lib2.RouteTree -> [Lib2.Query]
+-- treeToQueriesWithListAdd listName tree =
+--     let routeCreateQueries = treeToCreateQueries tree
+--         addRouteQueries = routeAddRouteQueriesFromTree tree
+--         listAddQuery = Lib2.ListAdd listName (Lib2.routeId' (routeTreeToRoute tree))
+--     in routeCreateQueries ++ addRouteQueries ++ [listAddQuery]
+
+-- -- Converts a RouteTree to the queries to create the route, ensuring correct order
+-- treeToCreateQueries :: Lib2.RouteTree -> [Lib2.Query]
+-- treeToCreateQueries Lib2.EmptyTree = []
+-- treeToCreateQueries (Lib2.Node (Lib2.NodeRoute routeId routeStops) childRoutes) =
+--     let createRouteQuery = Lib2.RouteCreate routeId
+--         addStopQueries = map (Lib2.RouteAddStop routeId) routeStops
+--         childRouteQueries = concatMap treeToCreateQueries childRoutes
+--     in createRouteQuery : (addStopQueries ++ childRouteQueries)
+
+-- -- Converts a RouteTree to a Route representation
+-- routeTreeToRoute :: Lib2.RouteTree -> Lib2.Route
+-- routeTreeToRoute (Lib2.Node (Lib2.NodeRoute routeId routeStops) childRoutes) =
+--     Lib2.Route routeId routeStops (map routeTreeToRoute childRoutes)
+-- routeTreeToRoute Lib2.EmptyTree = error "Cannot convert an empty tree to a route"
+
+-- -- Ensure that route-add-route queries are renerated between route creations
+-- routeAddRouteQueriesFromTree :: Lib2.RouteTree -> [Lib2.Query]
+-- routeAddRouteQueriesFromTree (Lib2.Node (Lib2.NodeRoute routeId _) childRoutes) =
+--     concatMap (\(Lib2.Node (Lib2.NodeRoute childRouteId _) _) -> 
+--         [Lib2.RouteAddRoute (Lib2.Route routeId [] []) (Lib2.Route childRouteId [] [])]) childRoutes
+-- routeAddRouteQueriesFromTree _ = []
 
 
 -- | Renders Statements into a String which
@@ -219,8 +309,8 @@ renderStatements (Batch queries) =
 renQuery :: Lib2.Query -> String
 renQuery (Lib2.ListCreate name) =
     "list-create " ++ renName name
-renQuery (Lib2.ListAdd name route) =
-    "list-add " ++ renName name ++ " " ++ renRoute route
+renQuery (Lib2.ListAdd name name') =
+    "list-add " ++ renName name ++ " " ++ renName name'
 renQuery (Lib2.ListGet name) =
     "list-get " ++ renName name
 renQuery (Lib2.ListRemove name) =
@@ -230,11 +320,11 @@ renQuery (Lib2.RouteCreate name) =
 renQuery (Lib2.RouteGet name) =
     "route-get " ++ renName name
 renQuery (Lib2.RouteAddRoute parentRoute childRoute) =
-    "route-add-route " ++ renRoute parentRoute ++ " " ++ renRoute childRoute
+    "route-add-route " ++ renName parentRoute ++ " " ++ renName childRoute
 renQuery (Lib2.RouteAddStop name stop) =
-    "route-add-stop " ++ renName name ++ " " ++ renStop stop
+    "route-add-stop " ++ renName name ++ " " ++ renName stop
 renQuery (Lib2.RouteRemoveStop name stop) =
-    "route-remove-stop " ++ renName name ++ " " ++ renStop stop
+    "route-remove-stop " ++ renName name ++ " " ++ renName stop
 renQuery (Lib2.RouteRemove name) =
     "route-remove " ++ renName name
 renQuery (Lib2.StopCreate name) =
@@ -242,20 +332,20 @@ renQuery (Lib2.StopCreate name) =
 renQuery (Lib2.StopDelete name) =
     "stop-delete " ++ renName name
 renQuery (Lib2.RoutesFromStop stop) =
-    "routes-from-stop " ++ renStop stop
+    "routes-from-stop " ++ renName stop
 
-renRoute :: Lib2.Route -> String
-renRoute (Lib2.Route routeId stops nestedRoutes) =
-        "<" ++ renName routeId ++ "{" ++ renStops stops ++ renNestedRoutes nestedRoutes ++ "}>"
+-- renRoute :: Lib2.Route -> String
+-- renRoute (Lib2.Route routeId stops nestedRoutes) =
+--         "<" ++ renName routeId ++ "{" ++ renStops stops ++ renNestedRoutes nestedRoutes ++ "}>"
 
-renStops :: [Lib2.Stop] -> String
-renStops stops = intercalate " " (map renStop stops)
+-- renStops :: [Lib2.Stop] -> String
+-- renStops stops = intercalate " " (map renStop stops)
 
-renStop :: Lib2.Stop -> String
-renStop (Lib2.Stop stopId) = "(" ++ renName stopId ++ ")"
+-- renStop :: Lib2.Stop -> String
+-- renStop (Lib2.Stop stopId) = "(" ++ renName stopId ++ ")"
 
-renNestedRoutes :: [Lib2.Route] -> String
-renNestedRoutes nestedRoutes = intercalate " " (map renRoute nestedRoutes)
+-- renNestedRoutes :: [Lib2.Route] -> String
+-- renNestedRoutes nestedRoutes = intercalate " " (map renRoute nestedRoutes)
 
 renName :: Lib2.Name -> String
 -- renName (Lib2.NumberName n) = show n

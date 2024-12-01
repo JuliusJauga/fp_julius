@@ -1,10 +1,9 @@
 BEGIN 
-route-create r3;
-route-create r4;
-route-add-route <r3{}> <r4{}>;
-list-create list;
-route-create r1;
+stop-create s;
 route-create r2;
-route-add-route <r1{}> <r2{}>;
-list-add list <r1{<r2{}>}>;
+route-add-stop r2 s;
+list-create l;
+route-create r;
+route-add-stop r s;
+list-add l r;
 END

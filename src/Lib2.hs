@@ -35,7 +35,8 @@ module Lib2 (
         parseMany,
         and2',
         char,
-        or2
+        or2,
+        routeTreeToRoute
     ) where
 
     import Data.Char (isAlphaNum, isDigit, isLetter)
@@ -277,7 +278,7 @@ module Lib2 (
     -- Parse a list-add query
     -- <list_add> ::= "list-add " <name> <route>
     parseListAdd :: Parser Query
-    parseListAdd = and4' (\_ listName _ route -> ListAdd listName route) (string "list-add ") name (char ' ') parseRoute
+    parseListAdd = and4' (\_ listName _ routeName -> ListAdd listName routeName) (string "list-add ") name (char ' ') name
 
     -- Parse a list-get query
     -- <list_get> ::= "list-get " <name>
@@ -305,9 +306,9 @@ module Lib2 (
     parseRouteAddRoute = and4'
         (\_ parentRoute _ childRoute -> RouteAddRoute parentRoute childRoute)
         (string "route-add-route ")
-        parseRoute
+        name
         (char ' ')
-        parseRoute
+        name
     -- Parse a route-remove query
     -- <route_remove> ::= "route-remove " <name>
     parseRouteRemove :: Parser Query
@@ -326,15 +327,15 @@ module Lib2 (
     -- Parse a route-remove query
     -- <route_remove_stop> :: "route-remove-stop " <name> <stop>
     parseRouteRemoveStop :: Parser Query
-    parseRouteRemoveStop = and4' (\_ routeId _ stop -> RouteRemoveStop routeId stop) (string "route-remove-stop ") name (char ' ') parseStop
+    parseRouteRemoveStop = and4' (\_ routeId _ stop -> RouteRemoveStop routeId stop) (string "route-remove-stop ") name (char ' ') name
 
     -- Parse a route-add query
     -- <route_add_stop> :: "route-add-stop " <name> <stop>
     parseRouteAddStop :: Parser Query
-    parseRouteAddStop = and4' (\_ routeId _ stop -> RouteAddStop routeId stop) (string "route-add-stop ") name (char ' ') parseStop
+    parseRouteAddStop = and4' (\_ routeId _ stop -> RouteAddStop routeId stop) (string "route-add-stop ") name (char ' ') name
 
     parseRoutesFromStop :: Parser Query
-    parseRoutesFromStop = and2' (\_ stop -> RoutesFromStop stop) (string "routes-from-stop ") parseStop
+    parseRoutesFromStop = and2' (\_ stop -> RoutesFromStop stop) (string "routes-from-stop ") name
 
     -- Main query parser
     parseQuery :: Parser Query
@@ -347,18 +348,18 @@ module Lib2 (
     -- Query definition.
     data Query
         = ListCreate Name
-        | ListAdd Name Route
+        | ListAdd Name Name
         | ListGet Name
         | ListRemove Name
         | RouteCreate Name
         | RouteGet Name
-        | RouteAddRoute Route Route
-        | RouteAddStop Name Stop
-        | RouteRemoveStop Name Stop
+        | RouteAddRoute Name Name
+        | RouteAddStop Name Name
+        | RouteRemoveStop Name Name
         | RouteRemove Name
         | StopCreate Name
         | StopDelete Name
-        | RoutesFromStop Stop
+        | RoutesFromStop Name
         deriving (Show, Eq)
 
     -- Define the State data type
@@ -434,13 +435,13 @@ module Lib2 (
     stateTransition (State routeLists routes' stops'') (ListCreate listName) =
         Right $ State ((listName, []) : routeLists) routes' stops''
 
-    stateTransition (State routeLists routes' stops'') (ListAdd listName route) =
-        let (existingRoutes, remainingRoutes) = partition (\r -> routeId' r == routeId' route) routes'
-            updatedRoute = route { stops' = stops' route }
+    stateTransition (State routeLists routes' stops'') (ListAdd listName routeName) =
+        let (existingRoutes, remainingRoutes) = partition (\r -> routeId' r == routeName) routes'
         in case existingRoutes of
             [] -> Left "No existing routes found to add."
             (_:_) ->
-                let routeTree = insertRoute updatedRoute EmptyTree
+                let updatedRoute = head existingRoutes
+                    routeTree = insertRoute updatedRoute EmptyTree
                     updatedRouteLists = map (\(name', trees) ->
                         if name' == listName
                         then (name', routeTree : trees)
@@ -465,17 +466,25 @@ module Lib2 (
     stateTransition (State routeLists routes' stops'') (RouteGet _) =
         Right $ State routeLists routes' stops''
 
-    stateTransition (State routeLists routes' stops'') (RouteAddRoute parentRoute childRoute) =
-        let remainingRoutes = filter (\r -> routeId' r /= routeId' childRoute) routes'
-            updateNestedRoutes route =
-                if routeId' route == routeId' parentRoute
-                then route { 
+    stateTransition (State routeLists routes' stops'') (RouteAddRoute parentRouteName childRouteName) =
+        let (parentRoutes, remainingRoutes) = partition (\r -> routeId' r == parentRouteName) routes'
+            (childRoutes, remainingRoutes') = partition (\r -> routeId' r == childRouteName) remainingRoutes
+            updateNestedRoutes route childRoute =
+                route { 
                     stops' = stops' route ++ stops' childRoute,
                     nestedRoutes' = nestedRoutes' route ++ [childRoute]
                     }
-                else route { nestedRoutes' = map updateNestedRoutes (nestedRoutes' route) }
-            updatedRoutes = map updateNestedRoutes remainingRoutes
-        in Right $ State routeLists updatedRoutes stops''
+        in case (parentRoutes, childRoutes) of 
+            ([], _) -> Left "No parent route found."
+            (_, []) -> Left "No child route found."
+            (_:_, _:_) ->
+                let updatedRoutes = map (\r ->
+                        if routeId' r == parentRouteName
+                        then updateNestedRoutes r (head childRoutes)
+                        else r
+                        ) (head parentRoutes : remainingRoutes')
+                in Right $ State routeLists updatedRoutes stops''
+
 
     stateTransition (State routeLists routes' stops'') (RouteRemove routeId) =
         let (removedRoutes, remainingRoutes) = partition (\r -> routeId' r == routeId) routes'
@@ -483,32 +492,32 @@ module Lib2 (
             [] -> Left "No route found to remove."
             (_:_) -> Right $ State routeLists remainingRoutes stops''
 
-    stateTransition (State routeLists routes' stops'') (RouteAddStop routeId stop) =
+    stateTransition (State routeLists routes' stops'') (RouteAddStop routeId stopName) =
         let (existingRoutes, remainingRoutes) = partition (\r -> routeId' r == routeId) routes'
         in case existingRoutes of
             [] -> Left "No route found to add a stop to."
             (r:_) ->
-                if stop `elem` stops''
+                if stopName `elem` map stopId' stops''
                 then
                     let
                         updatedRoutes = map (\r' ->
                                 if routeId' r' == routeId
-                                then r' { stops' = stops' r' ++ [stop] }
+                                then r' { stops' = stops' r' ++ [Stop stopName] }
                                 else r'
                             ) (r : remainingRoutes)
                     in Right $ State routeLists updatedRoutes stops''
                 else Left "Stop not found in the stops list."
 
-    stateTransition (State routeLists routes' stops'') (RouteRemoveStop routeId stop) =
+    stateTransition (State routeLists routes' stops'') (RouteRemoveStop routeId stopName) =
         let (existingRoutes, remainingRoutes) = partition (\r -> routeId' r == routeId) routes'
         in case existingRoutes of
             [] -> Left "No route found to remove a stop from."
             (r:_) ->
-                if stop `elem` stops' r
+                if stopName `elem` map stopId' (stops' r)
                 then
                     let updatedRoutes = map (\r' ->
                             if routeId' r' == routeId
-                            then r' { stops' = filter (\s -> stopId' s /= stopId' stop) (stops' r') }
+                            then r' { stops' = filter (\s -> stopId' s /= stopName) (stops' r') }
                             else r'
                             ) (r : remainingRoutes)
                     in Right $ State routeLists updatedRoutes stops''
@@ -524,11 +533,15 @@ module Lib2 (
         in case removedStops of
             [] -> Left "Stop not found to delete."
             (_:_) -> Right $ State routeLists routes' remainingStops
-    stateTransition (State routeLists routes' _) (RoutesFromStop stop) =
-        let routesFromStop' = routesFromStopInLists stop routeLists
-            routesFromStop'' = routeFromStopInNestedRoutes stop routes'
-        in Left $ displayRoutesFromStop (routesFromStop' ++ routesFromStop'') stop
+    stateTransition (State routeLists routes' _) (RoutesFromStop stopName) =
+        let routesFromStop' = routesFromStopInLists (Stop stopName) routeLists
+            routesFromStop'' = routeFromStopInNestedRoutes (Stop stopName) routes'
+        in Left $ displayRoutesFromStop (routesFromStop' ++ routesFromStop'') (Stop stopName)
     
+    routeTreeToRoute :: RouteTree -> Route
+    routeTreeToRoute EmptyTree = Route singletonName [] []
+    routeTreeToRoute (Node nodeRoute childRoutes) =
+        Route (nodeRouteId nodeRoute) (nodeStops nodeRoute) (map routeTreeToRoute childRoutes)
 
     -- Helper function to extract all stops from a RouteTree
     nodeStopsFromTree :: RouteTree -> [Stop]

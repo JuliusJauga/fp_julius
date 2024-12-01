@@ -1,23 +1,42 @@
 Welcome! Press [TAB] for auto completion, type ':paste' for multiline input
+>>> list-create l
+State {routeTreeLists = [(StringName "l",[])], routes = [], stops = []}
+>>> route-create r
+State {routeTreeLists = [(StringName "l",[])], routes = [Route {routeId' = StringName "r", stops' = [], nestedRoutes' = []}], stops = []}
+>>> route-create r2
+State {routeTreeLists = [(StringName "l",[])], routes = [Route {routeId' = StringName "r2", stops' = [], nestedRoutes' = []},Route {routeId' = StringName "r", stops' = [], nestedRoutes' = []}], stops = []}
+>>> stop-create s
+State {routeTreeLists = [(StringName "l",[])], routes = [Route {routeId' = StringName "r2", stops' = [], nestedRoutes' = []},Route {routeId' = StringName "r", stops' = [], nestedRoutes' = []}], stops = [Stop {stopId' = StringName "s"}]}
+>>> route-add-stop r s
+State {routeTreeLists = [(StringName "l",[])], routes = [Route {routeId' = StringName "r", stops' = [Stop {stopId' = StringName "s"}], nestedRoutes' = []},Route {routeId' = StringName "r2", stops' = [], nestedRoutes' = []}], stops = [Stop {stopId' = StringName "s"}]}
+>>> route-add-stop r2 s
+State {routeTreeLists = [(StringName "l",[])], routes = [Route {routeId' = StringName "r2", stops' = [Stop {stopId' = StringName "s"}], nestedRoutes' = []},Route {routeId' = StringName "r", stops' = [Stop {stopId' = StringName "s"}], nestedRoutes' = []}], stops = [Stop {stopId' = StringName "s"}]}
+>>> list-add r
+PARSE ERROR:Unexpected end of input, Expected 'list-create ', Expected 'list-get ', Expected 'list-remove ', Expected 'route-create ', Expected 'route-get ', Expected 'route-add-route ', Expected 'route-remove ', Expected 'route-add-stop ', Expected 'route-remove-stop ', Expected 'stop-create ', Expected 'stop-delete ', Expected 'routes-from-stop '
+>>> list-add l r
+State {routeTreeLists = [(StringName "l",[Node (NodeRoute {nodeRouteId = StringName "r", nodeStops = [Stop {stopId' = StringName "s"}]}) []])], routes = [Route {routeId' = StringName "r2", stops' = [Stop {stopId' = StringName "s"}], nestedRoutes' = []}], stops = [Stop {stopId' = StringName "s"}]}
+>>> save
+State {routeTreeLists = [(StringName "l",[Node (NodeRoute {nodeRouteId = StringName "r", nodeStops = [Stop {stopId' = StringName "s"}]}) []])], routes = [Route {routeId' = StringName "r2", stops' = [Stop {stopId' = StringName "s"}], nestedRoutes' = []}], stops = [Stop {stopId' = StringName "s"}]}
+>>> 
+[9]+  Stopped                 stack run fp2024-three
+root@d5cfed85b082:/workspaces/fp_julius# stack run fp2024-three
+Welcome! Press [TAB] for auto completion, type ':paste' for multiline input
 >>> :paste
 -- Entering multi-line mode. Press <Ctrl-D> to finish.
-| BEGIN
-| list-create list;
-| route-create r1;
+| BEGIN 
+| stop-create s;
 | route-create r2;
-| route-create r3;
-| route-create r4;
-| route-add-route <r1{}> <r2{}>;
-| route-add-route <r3{}> <r4{}>;
-| list-add list <r1{<r2{}>}>;
+| route-add-stop r2 s;
+| list-create l;
+| route-create r;
+| route-add-stop r s;
+| list-add l r;
 | END
 | 
-State {routeTreeLists = [(StringName "list",[Node (NodeRoute {nodeRouteId = StringName "r1", nodeStops = []}) [Node (NodeRoute {nodeRouteId = StringName "r2", nodeStops = []}) []]])], routes = [Route {routeId' = StringName "r3", stops' = [], nestedRoutes' = [Route {routeId' = StringName "r4", stops' = [], nestedRoutes' = []}]}], stops = []}
->>> save
-State {routeTreeLists = [(StringName "list",[Node (NodeRoute {nodeRouteId = StringName "r1", nodeStops = []}) [Node (NodeRoute {nodeRouteId = StringName "r2", nodeStops = []}) []]])], routes = [Route {routeId' = StringName "r3", stops' = [], nestedRoutes' = [Route {routeId' = StringName "r4", stops' = [], nestedRoutes' = []}]}], stops = []}
+State {routeTreeLists = [(StringName "l",[Node (NodeRoute {nodeRouteId = StringName "r", nodeStops = [Stop {stopId' = StringName "s"}]}) []])], routes = [Route {routeId' = StringName "r2", stops' = [Stop {stopId' = StringName "s"}], nestedRoutes' = []}], stops = [Stop {stopId' = StringName "s"}]}
 >>> 
-[1]+  Stopped                 stack run fp2024-three
+[10]+  Stopped                 stack run fp2024-three
 root@d5cfed85b082:/workspaces/fp_julius# stack run fp2024-three
 Welcome! Press [TAB] for auto completion, type ':paste' for multiline input
 >>> load
-State {routeTreeLists = [(StringName "list",[Node (NodeRoute {nodeRouteId = StringName "r1", nodeStops = []}) [Node (NodeRoute {nodeRouteId = StringName "r2", nodeStops = []}) []]])], routes = [Route {routeId' = StringName "r3", stops' = [], nestedRoutes' = [Route {routeId' = StringName "r4", stops' = [], nestedRoutes' = []}]}], stops = []}
+State {routeTreeLists = [(StringName "l",[Node (NodeRoute {nodeRouteId = StringName "r", nodeStops = [Stop {stopId' = StringName "s"}]}) []])], routes = [Route {routeId' = StringName "r2", stops' = [Stop {stopId' = StringName "s"}], nestedRoutes' = []}], stops = [Stop {stopId' = StringName "s"}]}

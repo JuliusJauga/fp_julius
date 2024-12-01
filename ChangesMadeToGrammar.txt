@@ -26,4 +26,10 @@ The following changes were made to grammar:
         2. <compound_query>
         3. <commands_list>
         4. <load_commands>
-        5. <save_commands>  
+        5. <save_commands>
+
+    7. Changed parsing element parameters.
+        *. All commands which needed parameters with full definition of the 
+        component now changed to just the name.
+        e.q. route-add-route <r{}> <r2{}> is now changed to
+             route-add-route r r2

@@ -293,7 +293,7 @@ module Lib2 (
     -- Parse a list-remove query
     -- <list_remove> ::= "list-remove " <name>
     parseRouteCreate :: Parser Query
-    parseRouteCreate = and2' (\_ routeId -> RouteCreate routeId) (string "route-create ") name
+    parseRouteCreate = and2' (\_ route -> RouteCreate route) (string "route-create ") parseRoute
 
     -- Parse a route-get query
     -- <route_get> ::= "route-get " <name>
@@ -351,7 +351,7 @@ module Lib2 (
         | ListAdd Name Name
         | ListGet Name
         | ListRemove Name
-        | RouteCreate Name
+        | RouteCreate Route
         | RouteGet Name
         | RouteAddRoute Name Name
         | RouteAddStop Name Name
@@ -458,10 +458,15 @@ module Lib2 (
             uniqueRemovedRoutes = filter (\r -> not (any (\r' -> routeId' r == routeId' r') routes')) removedRoutes
         in Right $ State updatedRouteLists (routes' ++ uniqueRemovedRoutes) stops''
 
-    stateTransition (State routeLists routes' stops'') (RouteCreate routeId) =
-        if any (\r -> routeId' r == routeId) routes'
+    stateTransition (State routeLists routes' stops'') (RouteCreate route) =
+        if any (\r -> routeId' r == routeId' route) routes'
         then Left "Route already exists."
-        else Right $ State routeLists (Route routeId [] [] : routes') stops''
+        else
+            let stopIds = map stopId' (stops' route)
+                allStopIds = map stopId' stops''
+            in if all (`elem` allStopIds) stopIds
+                then Right $ State routeLists (route : routes') stops''
+                else Left "Stops don't exist in the stops list."
 
     stateTransition (State routeLists routes' stops'') (RouteGet _) =
         Right $ State routeLists routes' stops''
@@ -582,3 +587,7 @@ module Lib2 (
 
     displayStopName :: Stop -> String
     displayStopName = show
+
+
+
+    

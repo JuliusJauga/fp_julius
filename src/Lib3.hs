@@ -142,12 +142,15 @@ splitOn c (x:xs)
 marshallState :: Lib2.State -> Statements
 marshallState (Lib2.State routeTreeLists routes stops) =
     let stopQueries = map stopToQuery stops
-        routeQueries = concatMap routeToQueries routes
+        routeQueriesWithStopCreate = concatMap routeToQueries routes
         listQueriesWithStopCreate = concatMap listToQueries routeTreeLists
-        stopQueries' = cancelDuplicateStopCreateQueries (stopQueries ++ listQueriesWithStopCreate)
-        listQueries = filter (\q -> case q of 
+        stopQueries' = cancelDuplicateStopCreateQueries (stopQueries ++ listQueriesWithStopCreate ++ routeQueriesWithStopCreate)
+        listQueries = filter (\q -> case q of
             Lib2.StopCreate _ -> False
             _ -> True) listQueriesWithStopCreate
+        routeQueries = filter (\q -> case q of
+            Lib2.StopCreate _ -> False
+            _ -> True) routeQueriesWithStopCreate
     in Batch (stopQueries' ++ routeQueries ++ listQueries)
 
 
@@ -173,26 +176,16 @@ cancelDuplicateStopCreateQueries queries =
         stopCreateQueries = filter (\q -> case q of
             Lib2.StopCreate _ -> True
             _ -> False) queries
-        uniqueStopCreates = removeDuplicateStopCreates stopCreateQueries []   
+        uniqueStopCreates = removeDuplicateStopCreates stopCreateQueries []
     in uniqueStopCreates
 
 
 -- Converts a Route into a series of queries, including RouteAddStop queries
 routeToQueries :: Lib2.Route -> [Lib2.Query]
 routeToQueries (Lib2.Route routeId routeStops nestedRoutes) =
-    let createRouteQuery = Lib2.RouteCreate routeId
-        addStopQueries = map (Lib2.RouteAddStop routeId . Lib2.stopId') routeStops  -- Adding stops to the route
-        addNestedRouteQueries = concatMap routeToQueriesNested nestedRoutes  -- renerate queries for nested routes
-        addRouteAddRouteQueries = concatMap (routeAddRouteQueries routeId) nestedRoutes  -- renerate queries for adding nested routes
-    in createRouteQuery : (addStopQueries ++ addNestedRouteQueries ++ addRouteAddRouteQueries)
-
--- Helper function to renerate queries for nested routes
-routeToQueriesNested :: Lib2.Route -> [Lib2.Query]
-routeToQueriesNested (Lib2.Route nestedRouteId nestedRouteStops nestedNestedRoutes) =
-    let createNestedRouteQuery = Lib2.RouteCreate nestedRouteId
-        addStopQueries = map (Lib2.RouteAddStop nestedRouteId . Lib2.stopId') nestedRouteStops  -- Adding stops to the nested route
-        addNestedRouteQueries = concatMap routeToQueriesNested nestedNestedRoutes  -- Recurse for any further nested routes
-    in createNestedRouteQuery : (addStopQueries ++ addNestedRouteQueries)
+    let createRouteQuery = Lib2.RouteCreate (Lib2.Route routeId routeStops nestedRoutes)
+        createStopQueries = map (Lib2.StopCreate . stopId') routeStops  -- Adding stops to the route
+    in createStopQueries ++ [createRouteQuery]
 
 -- renerates queries for adding a child route to a parent route
 routeAddRouteQueries :: Lib2.Name -> Lib2.Route -> [Lib2.Query]
@@ -243,8 +236,8 @@ renQuery (Lib2.ListGet name) =
     "list-get " ++ renName name
 renQuery (Lib2.ListRemove name) =
     "list-remove " ++ renName name
-renQuery (Lib2.RouteCreate name) =
-    "route-create " ++ renName name
+renQuery (Lib2.RouteCreate route) =
+    "route-create " ++ renRoute route
 renQuery (Lib2.RouteGet name) =
     "route-get " ++ renName name
 renQuery (Lib2.RouteAddRoute parentRoute childRoute) =
@@ -262,18 +255,18 @@ renQuery (Lib2.StopDelete name) =
 renQuery (Lib2.RoutesFromStop stop) =
     "routes-from-stop " ++ renName stop
 
--- renRoute :: Lib2.Route -> String
--- renRoute (Lib2.Route routeId stops nestedRoutes) =
---         "<" ++ renName routeId ++ "{" ++ renStops stops ++ renNestedRoutes nestedRoutes ++ "}>"
+renRoute :: Lib2.Route -> String
+renRoute (Lib2.Route routeId stops nestedRoutes) =
+        "<" ++ renName routeId ++ "{" ++ renStops stops ++ renNestedRoutes nestedRoutes ++ "}>"
 
--- renStops :: [Lib2.Stop] -> String
--- renStops stops = intercalate " " (map renStop stops)
+renStops :: [Lib2.Stop] -> String
+renStops stops = intercalate "" (map renStop stops)
 
--- renStop :: Lib2.Stop -> String
--- renStop (Lib2.Stop stopId) = "(" ++ renName stopId ++ ")"
+renStop :: Lib2.Stop -> String
+renStop (Lib2.Stop stopId) = "(" ++ renName stopId ++ ")"
 
--- renNestedRoutes :: [Lib2.Route] -> String
--- renNestedRoutes nestedRoutes = intercalate " " (map renRoute nestedRoutes)
+renNestedRoutes :: [Lib2.Route] -> String
+renNestedRoutes nestedRoutes = intercalate "" (map renRoute nestedRoutes)
 
 renName :: Lib2.Name -> String
 -- renName (Lib2.NumberName n) = show n

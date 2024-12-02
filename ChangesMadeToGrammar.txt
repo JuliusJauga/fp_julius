@@ -33,3 +33,5 @@ The following changes were made to grammar:
         component now changed to just the name.
         e.q. route-add-route <r{}> <r2{}> is now changed to
              route-add-route r r2
+    8. Parameters.
+        1. route-create command now takes route as paramater.

@@ -29,7 +29,7 @@
 <list_get> ::= "list-get " <name>
 <list_remove> ::= "list-remove " <name>
 
-<route_create> ::= "route-create " <name>
+<route_create> ::= "route-create " <route>
 <route_get> ::= "route-get " <name>
 <route_add_route> ::= "route-add-route " <name> " " <name>
 <route_remove> ::= "route-remove " <name>

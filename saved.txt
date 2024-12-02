@@ -1,9 +1,7 @@
 BEGIN 
+stop-create s2;
 stop-create s;
-route-create r2;
-route-add-stop r2 s;
 list-create l;
-route-create r;
-route-add-stop r s;
+route-create <r{(s)<r2{(s2)}>}>;
 list-add l r;
 END

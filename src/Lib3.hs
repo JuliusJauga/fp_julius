@@ -94,15 +94,19 @@ parseStatements input =
                     in if null body
                         then Right (Batch [], "") -- empty batch
                         else
-                            let queries = map (Lib2.parseQuery . trim) (filter (not . null) $ splitOn ';' body)
-                                (errors, parsedQueries) = partitionEithers queries
-                            in if null errors
+                            if ';' `elem` body
                                 then
-                                    let queriesList = map fst parsedQueries
-                                    in if length queriesList == 1
-                                        then Right (Single (head queriesList), "")
-                                        else Right (Batch queriesList, "")
-                                else Left $ "Error parsing queries: " ++ unlines errors
+                                    let queries = map (Lib2.parseQuery . trim) (filter (not . null) $ splitOn ';' body)
+                                        (errors, parsedQueries) = partitionEithers queries
+                                    in if null errors
+                                        then
+                                            let queriesList = map fst parsedQueries
+                                            in Right (Batch queriesList, "")
+                                        else Left $ "Error parsing queries: " ++ unlines errors
+                                else
+                                    case Lib2.parseQuery body of
+                                        Left err -> Left err
+                                        Right (query, _) -> Right (Single query, "")
                 else Left "Batch must end with 'END'"
         else Left "Batch must start with 'BEGIN'"
 
@@ -217,82 +221,6 @@ treeToCreateQueries (Lib2.Node (Lib2.NodeRoute routeId routeStops) childRoutes) 
         createRouteQueries = routeToQueries route
     in createStopsQueries ++ createRouteQueries
 
-
-
-
-
--- marshallState :: Lib2.State -> Statements
--- marshallState (Lib2.State routeTreeLists routes stops) =
---     let stopQueries = map stopToQuery stops
---         routeQueries = concatMap routeToQueries routes
---         listQueries = concatMap listToQueries routeTreeLists
---     in Batch (stopQueries ++ routeQueries ++ listQueries)
-
--- -- Converts a Stop into a StopCreate query
--- stopToQuery :: Lib2.Stop -> Lib2.Query
--- stopToQuery (Lib2.Stop stopId) = Lib2.StopCreate stopId
-
--- -- Converts a Route into a series of queries, including RouteAddStop queries
--- routeToQueries :: Lib2.Route -> [Lib2.Query]
--- routeToQueries (Lib2.Route routeId routeStops nestedRoutes) =
---     let createRouteQuery = Lib2.RouteCreate routeId
---         addStopQueries = map (Lib2.RouteAddStop routeId) routeStops  -- Adding stops to the route
---         addNestedRouteQueries = concatMap routeToQueriesNested nestedRoutes  -- renerate queries for nested routes
---         addRouteAddRouteQueries = concatMap (routeAddRouteQueries routeId) nestedRoutes  -- renerate queries for adding nested routes
---     in createRouteQuery : (addStopQueries ++ addNestedRouteQueries ++ addRouteAddRouteQueries)
-
--- -- Helper function to renerate queries for nested routes
--- routeToQueriesNested :: Lib2.Route -> [Lib2.Query]
--- routeToQueriesNested (Lib2.Route nestedRouteId nestedRouteStops nestedNestedRoutes) =
---     let createNestedRouteQuery = Lib2.RouteCreate nestedRouteId
---         addStopQueries = map (Lib2.RouteAddStop nestedRouteId) nestedRouteStops  -- Adding stops to the nested route
---         addNestedRouteQueries = concatMap routeToQueriesNested nestedNestedRoutes  -- Recurse for any further nested routes
---     in createNestedRouteQuery : (addStopQueries ++ addNestedRouteQueries)
-
--- renerates queries for adding a child route to a parent route
--- routeAddRouteQueries :: Lib2.Name -> Lib2.Route -> [Lib2.Query]
--- routeAddRouteQueries parentId childRoute =
---     let addRouteQuery = [Lib2.RouteAddRoute (Lib2.Route parentId [] []) childRoute]
---     in addRouteQuery
-
--- -- Converts a RouteTreeList to a series of queries
--- listToQueries :: (Lib2.Name, [Lib2.RouteTree]) -> [Lib2.Query]
--- listToQueries (listName, trees) =
---     let createListQuery = Lib2.ListCreate listName
---         treeQueries = concatMap (treeToQueriesWithListAdd listName) trees
---     in createListQuery : treeQueries
-
--- -- Converts a RouteTree to queries, ensuring it includes a ListAdd query for the list
--- treeToQueriesWithListAdd :: Lib2.Name -> Lib2.RouteTree -> [Lib2.Query]
--- treeToQueriesWithListAdd listName tree =
---     let routeCreateQueries = treeToCreateQueries tree
---         addRouteQueries = routeAddRouteQueriesFromTree tree
---         listAddQuery = Lib2.ListAdd listName (Lib2.routeId' (routeTreeToRoute tree))
---     in routeCreateQueries ++ addRouteQueries ++ [listAddQuery]
-
--- -- Converts a RouteTree to the queries to create the route, ensuring correct order
--- treeToCreateQueries :: Lib2.RouteTree -> [Lib2.Query]
--- treeToCreateQueries Lib2.EmptyTree = []
--- treeToCreateQueries (Lib2.Node (Lib2.NodeRoute routeId routeStops) childRoutes) =
---     let createRouteQuery = Lib2.RouteCreate routeId
---         addStopQueries = map (Lib2.RouteAddStop routeId) routeStops
---         childRouteQueries = concatMap treeToCreateQueries childRoutes
---     in createRouteQuery : (addStopQueries ++ childRouteQueries)
-
--- -- Converts a RouteTree to a Route representation
--- routeTreeToRoute :: Lib2.RouteTree -> Lib2.Route
--- routeTreeToRoute (Lib2.Node (Lib2.NodeRoute routeId routeStops) childRoutes) =
---     Lib2.Route routeId routeStops (map routeTreeToRoute childRoutes)
--- routeTreeToRoute Lib2.EmptyTree = error "Cannot convert an empty tree to a route"
-
--- -- Ensure that route-add-route queries are renerated between route creations
--- routeAddRouteQueriesFromTree :: Lib2.RouteTree -> [Lib2.Query]
--- routeAddRouteQueriesFromTree (Lib2.Node (Lib2.NodeRoute routeId _) childRoutes) =
---     concatMap (\(Lib2.Node (Lib2.NodeRoute childRouteId _) _) -> 
---         [Lib2.RouteAddRoute (Lib2.Route routeId [] []) (Lib2.Route childRouteId [] [])]) childRoutes
--- routeAddRouteQueriesFromTree _ = []
-
-
 -- | Renders Statements into a String which
 -- can be parsed back into Statements by parseStatements
 -- function. The String returned by this function must be used
@@ -301,7 +229,7 @@ treeToCreateQueries (Lib2.Node (Lib2.NodeRoute routeId routeStops) childRoutes) 
 -- for all s: parseStatements (renderStatements s) == Right(s, "")
 renderStatements :: Statements -> String
 renderStatements (Single query) =
-    "BEGIN \n" ++ renQuery query ++ ";\nEND"
+    "BEGIN \n" ++ renQuery query ++ "\nEND"
 renderStatements (Batch queries) =
     "BEGIN \n" ++ unlines (map (\q -> renQuery q ++ ";") queries) ++ "END"
 

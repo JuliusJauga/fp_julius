@@ -342,4 +342,4 @@ stateTransition stateVar command ioChan = case command of
             Right newState -> do
               writeTVar stateVar newState
               return $ Right (Just "Statement executed successfully.", show newState)
-            Left err -> return $ Left ("Error executing statement: " ++ err)
+            Left err -> return $ Left err

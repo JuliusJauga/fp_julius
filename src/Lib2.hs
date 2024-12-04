@@ -39,6 +39,9 @@ module Lib2 (
         routeTreeToRoute
     ) where
 
+    import qualified Control.Monad.Trans.State.Strict as S (State, get, put, runState)
+    import Control.Monad.Trans.Except (ExceptT, throwE, runExceptT)
+    import Control.Monad.Trans.Class (lift)
     import Data.Char (isAlphaNum, isDigit, isLetter)
     import Data.List (isPrefixOf, partition)
 
@@ -51,7 +54,7 @@ module Lib2 (
         deriving (Show, Eq)
 
     -- Define the parser type
-    type Parser a = String -> Either String (a, String)
+    type Parser a = ExceptT String (S.State String) a
 
     -- Define and
     and7' :: (a -> b -> c -> d -> e -> f -> g -> h)
@@ -63,135 +66,94 @@ module Lib2 (
       -> Parser f
       -> Parser g
       -> Parser h
-    and7' g a b c d e f g' input =
-        case a input of
-            Right (v1, r1) ->
-                case b r1 of
-                    Right (v2, r2) ->
-                        case c r2 of
-                            Right (v3, r3) ->
-                                case d r3 of
-                                    Right (v4, r4) ->
-                                        case e r4 of
-                                            Right (v5, r5) ->
-                                                case f r5 of
-                                                    Right (v6, r6) ->
-                                                        case g' r6 of
-                                                            Right (v7, r7) -> Right (g v1 v2 v3 v4 v5 v6 v7, r7)
-                                                            Left e7 -> Left e7
-                                                    Left e6 -> Left e6
-                                            Left e5 -> Left e5
-                                    Left e4 -> Left e4
-                            Left e3 -> Left e3
-                    Left e2 -> Left e2
-            Left e1 -> Left e1
-
+    and7' f a b c d e f g h = do
+        v1 <- a
+        v2 <- b
+        v3 <- c
+        v4 <- d
+        v5 <- e
+        v6 <- f
+        v7 <- g
+        return $ f v1 v2 v3 v4 v5 v6 v7 h
+        
     and6' :: (a -> b -> c -> d -> e -> f -> g) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f -> Parser g
-    and6' g a b c d e f input =
-        case a input of
-            Right (v1, r1) ->
-                case b r1 of
-                    Right (v2, r2) ->
-                        case c r2 of
-                            Right (v3, r3) ->
-                                case d r3 of
-                                    Right (v4, r4) ->
-                                        case e r4 of
-                                            Right (v5, r5) ->
-                                                case f r5 of
-                                                    Right (v6, r6) -> Right (g v1 v2 v3 v4 v5 v6, r6)
-                                                    Left e6 -> Left e6
-                                            Left e5 -> Left e5
-                                    Left e4 -> Left e4
-                            Left e3 -> Left e3
-                    Left e2 -> Left e2
-            Left e1 -> Left e1
+    and6' f a b c d e g = do
+        v1 <- a
+        v2 <- b
+        v3 <- c
+        v4 <- d
+        v5 <- e
+        v6 <- g
+        return $ f v1 v2 v3 v4 v5 v6
 
     and5' :: (a -> b -> c -> d -> e -> f) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f
-    and5' f a b c d e input =
-        case a input of
-            Right (v1, r1) ->
-                case b r1 of
-                    Right (v2, r2) ->
-                        case c r2 of
-                            Right (v3, r3) ->
-                                case d r3 of
-                                    Right (v4, r4) ->
-                                        case e r4 of
-                                            Right (v5, r5) -> Right (f v1 v2 v3 v4 v5, r5)
-                                            Left e5 -> Left e5
-                                    Left e4 -> Left e4
-                            Left e3 -> Left e3
-                    Left e2 -> Left e2
-            Left e1 -> Left e1
+    and5' f a b c d e = do
+        v1 <- a
+        v2 <- b
+        v3 <- c
+        v4 <- d
+        v5 <- e
+        return $ f v1 v2 v3 v4 v5
+        
     and4' :: (a -> b -> c -> d -> e) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e
-    and4' f a b c d input =
-        case a input of
-            Right (v1, r1) ->
-                case b r1 of
-                    Right (v2, r2) ->
-                        case c r2 of
-                            Right (v3, r3) ->
-                                case d r3 of
-                                    Right (v4, r4) -> Right (f v1 v2 v3 v4, r4)
-                                    Left e4 -> Left e4
-                            Left e3 -> Left e3
-                    Left e2 -> Left e2
-            Left e1 -> Left e1
+    and4' f a b c d = do
+        v1 <- a
+        v2 <- b
+        v3 <- c
+        v4 <- d
+        return $ f v1 v2 v3 v4
+        
     and3' :: (a -> b -> c -> d) -> Parser a -> Parser b -> Parser c -> Parser d
-    and3' f a b c input =
-        case a input of
-            Right (v1, r1) ->
-                case b r1 of
-                    Right (v2, r2) ->
-                        case c r2 of
-                            Right (v3, r3) -> Right (f v1 v2 v3, r3)
-                            Left e3 -> Left e3
-                    Left e2 -> Left e2
-            Left e1 -> Left e1
+    and3' f a b c = do
+        v1 <- a
+        v2 <- b
+        v3 <- c
+        return $ f v1 v2 v3
     and2' :: (a -> b -> c) -> Parser a -> Parser b -> Parser c
-    and2' f a b input =
-        case a input of
-            Right (v1, r1) ->
-                case b r1 of
-                    Right (v2, r2) -> Right (f v1 v2, r2)
-                    Left e2 -> Left e2
-            Left e1 -> Left e1
+    and2' f a b = do
+        v1 <- a
+        v2 <- b
+        return $ f v1 v2
 
     or2 :: Parser a -> Parser a -> Parser a
-    or2 a b input =
-        case a input of
-            Right r1 -> Right r1
-            Left e1 ->
-                case b input of
-                    Right r2 -> Right r2
-                    Left e2 -> Left (e1 ++ ", " ++ e2)
+    or2 a b = do
+        input <- lift S.get
+        resultA <- runExceptT a
+        case resultA of
+            Right r1 -> return r1
+            Left e1 -> do
+                resultB <- runExceptT b
+                case resultB of
+                    Right r2 -> return r2
+                    Left e2 -> throwE (e1 ++ ", " ++ e2)
 
     -- <char>
     parseChar :: Char -> Parser Char
-    parseChar c [] = Left ("Cannot find " ++ [c] ++ " in an empty input")
-    parseChar c s@(h:t) = if c == h then Right (c, t) else Left (c : " is not found in " ++ s)
+    parseChar c = do
+        input <- lift S.get
+        case input of
+            [] -> throwE $ "Cannot find " ++ [c] ++ " in an empty input"
+            (h:t) -> if c == h then lift (S.put t) >> return c else throwE $ c : " is not found in " ++ [h]
 
     -- <word>
     parseWord :: Parser CustomWord
-    parseWord input =
-        let letters = takeWhile isLetter input
-            rest = drop (length letters) input
-        in if not (null letters)
-            then Right (CustomWord letters, rest)
-            else Left (input ++ " does not start with a letter")
+    parseWord = do
+        input <- lift S.get
+        let word = takeWhile isLetter input
+            rest = drop (length word) input
+        if null word
+            then throwE "not a word"
+            else lift (S.put rest) >> return (CustomWord word)
 
     -- <number>
     parseNumber :: Parser Int
-    parseNumber [] = Left "empty input, cannot parse a number"
-    parseNumber str =
-        let
-            digits = takeWhile isDigit str
-            rest = drop (length digits) str
-        in
-            case digits of
-                [] -> Left "not a number"
-                _ -> Right (read digits, rest)
+    parseNumber = do
+        input <- lift S.get
+        let digits = takeWhile isDigit input
+            rest = drop (length digits) input
+        if null digits
+            then throwE "not a number"
+            else lift (S.put rest) >> return (read digits)
 
     -- -- <word> " " <word>
     -- parseWordName :: Parser Name
@@ -205,39 +167,39 @@ module Lib2 (
 
     -- <string>
     parseStringName :: Parser Name
-    parseStringName input =
-        let (strName, rest) = span (\c -> isAlphaNum c || c == '_') input
-        in if null strName
-            then Left "Expected a valid string name."
-            else Right (StringName strName, rest)
+    parseStringName = do
+        input <- lift S.get
+        let str = takeWhile (/= ' ') input
+            rest = drop (length str) input
+        if null str
+            then throwE "not a string"
+            else lift (S.put rest) >> return (StringName str)
 
     -- <name> ::= <word> " " <word> | <number> | <string>
-    name :: Parser Name
-    name = parseStringName
+    parseName :: Parser Name
+    parseName = parseStringName
 
     -- Parsing components
     -- Helper function to parse many elements using another parser
     parseMany :: Parser a -> Parser [a]
-    parseMany parser input =
-        case parser input of
-            Right (x, rest) ->
-                case parseMany parser rest of
-                    Right (xs, rest') -> Right (x:xs, rest')
-                    Left _ -> Right ([x], rest)
-            Left _ -> Right ([], input)
+    parseMany parser = do
+        input <- lift S.get
+        case runExceptT parser input of
+            Right (r, rest) -> do
+                lift (S.put rest)
+                rs <- parseMany parser
+                return (r : rs)
+            Left _ -> return []
 
     -- Parse a single character
     -- <char> ::= "a" | "b" | "c" ...
     char :: Char -> Parser Char
-    char c (x:xs)
-        | c == x = Right (c, xs)
-        | otherwise = Left $ "Expected '" ++ [c] ++ "'"
-    char _ [] = Left "Unexpected end of input"
+    char c = parseChar c
 
     -- Parse a stop
     -- <stop> ::= "(" <stop_id> ")"
     parseStop :: Parser Stop
-    parseStop = and3' (\_ stopId _ -> Stop stopId) (char '(') name (char ')')
+    parseStop = and3' (\_ stopId _ -> Stop stopId) (char '(') parseName (char ')')
 
     -- Parse a list of stops
     -- <stop_list> ::= <stop>*
@@ -266,9 +228,11 @@ module Lib2 (
 
     -- Helper function to parse a string. Just to parse querys
     string :: String -> Parser String
-    string str input
-        | str `isPrefixOf` input = Right (str, drop (length str) input)
-        | otherwise = Left $ "Expected '" ++ str ++ "'"
+    string str = do
+        input <- lift S.get
+        if str `isPrefixOf` input
+            then lift (S.put (drop (length str) input)) >> return str
+            else throwE $ "Expected " ++ str ++ " but got " ++ input
 
     -- Parse a list-create query
     -- <list_create> ::= "list-create " <name>

@@ -1,6 +1,6 @@
 BEGIN 
-stop-create s2;
 stop-create s;
+stop-create s2;
 list-create l;
 route-create <r{(s)(s2)<r2{(s2)}>}>;
 list-add l r;

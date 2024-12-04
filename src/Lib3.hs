@@ -14,7 +14,7 @@ module Lib3
     ) where
 
 import Control.Concurrent ( Chan , readChan, writeChan, newChan )
-import Control.Concurrent.STM(TVar, atomically, readTVarIO, readTVar, writeTVar)
+import Control.Concurrent.STM (STM, TVar, atomically, newTVarIO, readTVar, writeTVar, readTVarIO )
 import Data.List (isPrefixOf, isSuffixOf, notElem, (\\), intercalate, find, delete, partition, nubBy)
 import qualified Lib2
 import Data.Char (isSpace)

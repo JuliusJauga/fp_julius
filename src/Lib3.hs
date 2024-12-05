@@ -68,22 +68,22 @@ trim = f . f
 
 
 -- | Parses user's input.
-parseCommand :: Lib2.Parser Command
+parseCommand :: String -> Either String (Command, String)
 parseCommand input
-    | "load" `isPrefixOf` input = Right (LoadCommand, drop 4 input)
-    | "save" `isPrefixOf` input = Right (SaveCommand, drop 4 input)
-    | "BEGIN" `isPrefixOf` input = case parseStatements input of
-        Left err -> Left err
-        Right (stmts, rest) -> Right (StatementCommand stmts, rest)
-    | otherwise = case Lib2.parseQuery (trim input) of
-        Left err -> Left err
-        Right (query, rest) -> Right (StatementCommand (Single query), rest)
+  | "load" `isPrefixOf` input = Right (LoadCommand, drop 4 input)
+  | "save" `isPrefixOf` input = Right (SaveCommand, drop 4 input)
+  | "BEGIN" `isPrefixOf` input = case parseStatements input of
+      Left err -> Left err
+      Right (stmts, rest) -> Right (StatementCommand stmts, rest)
+  | otherwise = case Lib2.parseQuery (trim input) of
+      Left err -> Left err
+      Right query -> Right (StatementCommand (Single query), "")
 
 -- | Parses Statement.
 -- Must be used in parseCommand.
 -- Reuse Lib2 as much as you can.
 -- You can change Lib2.parseQuery signature if needed.
-parseStatements :: Lib2.Parser Statements
+parseStatements :: String -> Either String (Statements, String)
 parseStatements input =
     let inputTrimmed = trim input
     in if "BEGIN" `isPrefixOf` inputTrimmed
@@ -100,13 +100,13 @@ parseStatements input =
                                         (errors, parsedQueries) = partitionEithers queries
                                     in if null errors
                                         then
-                                            let queriesList = map fst parsedQueries
+                                            let queriesList = parsedQueries
                                             in Right (Batch queriesList, "")
                                         else Left $ "Error parsing queries: " ++ unlines errors
                                 else
                                     case Lib2.parseQuery body of
                                         Left err -> Left err
-                                        Right (query, _) -> Right (Single query, "")
+                                        Right query -> Right (Single query, "")
                 else Left "Batch must end with 'END'"
         else Left "Batch must start with 'BEGIN'"
 

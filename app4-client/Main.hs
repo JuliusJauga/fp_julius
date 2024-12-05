@@ -1,20 +1,45 @@
 module Main (main) where
 
 import Data.ByteString.Lazy.Char8 (pack)
+import Data.ByteString.Lazy.Internal (ByteString)
 import Data.String.Conversions (cs)
 import Control.Lens
 import Control.Monad.Free (Free(..))
 import Control.Monad.State (StateT, get, modify)
 import Control.Monad.Except (ExceptT, throwError, runExceptT)
-import qualified DSL
+import qualified DSL as DSL
 import qualified Network.Wreq as NetworkWreq
 
 
-interpretOneByOne DSL.Program a -> IO a
+-- final :: Repl ExitDecision
+-- final = do
+--     liftIO $ putStrLn "Goodbye!"
+--     return Exit
+
+-- ini :: Repl ()
+-- ini = liftIO $ putStrLn "Welcome! Press [TAB] to for auto completion."
+
+-- completer :: (Monad m) => WordCompleter m
+-- completer n =
+--     return $ ":paste" : Prelude.filter (L.isPrefixOf n) Lib1.completions
+
+-- cmd :: String -> Repl ()
+-- cmd str = do
+--     case Lib3.parseCommand str of
+--         Left err -> liftIO $ "PARSE ERROR: " ++ err
+--         Right (Lib3.LoadCommand, "") -> do
+--             liftIO $ putStrLn "Loading..."
+            
+
+
+
+
+interpretOneByOne :: DSL.Domain a -> IO a
 interpretOneByOne (Pure a) = return a
 interpretOneByOne (Free (DSL.ListCreate name next)) = do
     putStrLn $ "Creating list " ++ name
-    _ <- NetworkWreq.post "http://localhost:3000" (pack $ "list-create " ++ name)
+    response <- NetworkWreq.post "http://localhost:3000" (pack $ "list-create " ++ name)
+    print response
     interpretOneByOne next
 interpretOneByOne (Free (DSL.ListAdd ingName listName next)) = do
     putStrLn $ "Adding " ++ ingName ++ " to " ++ listName
@@ -61,33 +86,51 @@ interpretOneByOne (Free (DSL.RoutesFromStop stopName f)) = do
     _ <- NetworkWreq.post "http://localhost:3000" (pack $ "routes-from-stop " ++ stopName)
     interpretOneByOne (f "routes")
 
-interpretBatch :: DSL.Program a -> IO a
+interpretOneByOne (Free (DSL.Save next)) = do
+    putStrLn "Saving"
+    _ <- NetworkWreq.post "http://localhost:3000" (pack "save")
+    interpretOneByOne next
+
+interpretOneByOne (Free (DSL.Load next)) = do
+    putStrLn "Loading"
+    _ <- NetworkWreq.post "http://localhost:3000" (pack "load")
+    interpretOneByOne next
+
+interpretBatch :: DSL.Domain a -> IO String
 interpretBatch program = do
     let commands = collectCommands program
-    _ <- NetworkWreq.post "http://localhost:3000" (pack $ unlines commands)
-    return undefined
+    response <- NetworkWreq.post "http://localhost:3000" (pack $ unlines ("BEGIN" : commands ++ ["END"]))
+    print response
+    return "Done"
 
-collectCommands :: DSL.Program a -> [String]
+collectCommands :: DSL.Domain a -> [String]
 collectCommands (Pure _) = []
-collectCommands (Free (DSL.ListCreate name next)) = ("list-create " ++ name) : collectCommands next
-collectCommands (Free (DSL.ListAdd ingName listName next)) = ("list-add " ++ ingName ++ " " ++ listName) : collectCommands next
-collectCommands (Free (DSL.ListRemove listName next)) = ("list-remove " ++ listName) : collectCommands next
-collectCommands (Free (DSL.ListGet name f)) = ("list-get " ++ name) : collectCommands (f "list")
-collectCommands (Free (DSL.RouteCreate name next)) = ("route-create " ++ name) : collectCommands next
-collectCommands (Free (DSL.RouteGet name f)) = ("route-get " ++ name) : collectCommands (f "route")
-collectCommands (Free (DSL.RouteAddRoute parentRouteName childRouteName next)) = ("route-add-route " ++ parentRouteName ++ " " ++ childRouteName) : collectCommands next
-collectCommands (Free (DSL.RouteAddStop routeName stopName next)) = ("route-add-stop " ++ routeName ++ " " ++ stopName) : collectCommands next
-collectCommands (Free (DSL.RouteRemoveStop routeName stopName next)) = ("route-remove-stop " ++ routeName ++ " " ++ stopName) : collectCommands next
-collectCommands (Free (DSL.StopCreate name next)) = ("stop-create " ++ name) : collectCommands next
-collectCommands (Free (DSL.StopDelete name next)) = ("stop-delete " ++ name) : collectCommands next
-collectCommands (Free (DSL.RoutesFromStop stopName f)) = ("routes-from-stop " ++ stopName) : collectCommands (f "routes")
-
+collectCommands (Free (DSL.ListCreate name next)) = ("list-create " ++ name ++ ";") : collectCommands next
+collectCommands (Free (DSL.ListAdd ingName listName next)) = ("list-add " ++ ingName ++ " " ++ listName ++ ";") : collectCommands next
+collectCommands (Free (DSL.ListRemove listName next)) = ("list-remove " ++ listName ++ ";") : collectCommands next
+collectCommands (Free (DSL.ListGet name f)) = ("list-get " ++ name ++ ";") : collectCommands (f "list")
+collectCommands (Free (DSL.RouteCreate name next)) = ("route-create " ++ name ++ ";") : collectCommands next
+collectCommands (Free (DSL.RouteGet name f)) = ("route-get " ++ name ++ ";") : collectCommands (f "route")
+collectCommands (Free (DSL.RouteAddRoute parentRouteName childRouteName next)) = ("route-add-route " ++ parentRouteName ++ " " ++ childRouteName ++ ";") : collectCommands next
+collectCommands (Free (DSL.RouteAddStop routeName stopName next)) = ("route-add-stop " ++ routeName ++ " " ++ stopName ++ ";") : collectCommands next
+collectCommands (Free (DSL.RouteRemoveStop routeName stopName next)) = ("route-remove-stop " ++ routeName ++ " " ++ stopName ++ ";") : collectCommands next
+collectCommands (Free (DSL.StopCreate name next)) = ("stop-create " ++ name ++ ";") : collectCommands next
+collectCommands (Free (DSL.StopDelete name next)) = ("stop-delete " ++ name ++ ";") : collectCommands next
+collectCommands (Free (DSL.RoutesFromStop stopName f)) = ("routes-from-stop " ++ stopName ++ ";") : collectCommands (f "routes")
+collectCommands (Free (DSL.Save next)) = "save;" : collectCommands next
+collectCommands (Free (DSL.Load next)) = "load;" : collectCommands next
 
 main :: IO ()
 main = do
     let program = do
-        DSL.listCreate "list1"
-        DSL.routeCreate "<route1{}>"
-        DSL.listAdd "list1" "route1"
+            DSL.listCreate "list1"
+            DSL.routeCreate "<route1{}>"
+    _ <- interpretBatch program
+    let program = do
+            DSL.stopCreate "stop1"
+            DSL.routeAddStop "route1" "stop1"
+    _ <- interpretOneByOne program
+    let program = do
+            DSL.save
     result <- interpretOneByOne program
     print result

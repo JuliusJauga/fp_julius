@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use <$>" #-}
 module Lib2 (
         Stop(..),
         Route(..),
@@ -66,15 +68,15 @@ module Lib2 (
       -> Parser f
       -> Parser g
       -> Parser h
-    and7' f a b c d e f g h = do
+    and7' f a b c d e g h = do
         v1 <- a
         v2 <- b
         v3 <- c
         v4 <- d
         v5 <- e
-        v6 <- f
-        v7 <- g
-        return $ f v1 v2 v3 v4 v5 v6 v7 h
+        v6 <- g
+        v7 <- h
+        return $ f v1 v2 v3 v4 v5 v6 v7
         
     and6' :: (a -> b -> c -> d -> e -> f -> g) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f -> Parser g
     and6' f a b c d e g = do
@@ -118,11 +120,11 @@ module Lib2 (
     or2 :: Parser a -> Parser a -> Parser a
     or2 a b = do
         input <- lift S.get
-        resultA <- runExceptT a
+        resultA <- lift $ runExceptT a
         case resultA of
             Right r1 -> return r1
             Left e1 -> do
-                resultB <- runExceptT b
+                resultB <- lift $ runExceptT b
                 case resultB of
                     Right r2 -> return r2
                     Left e2 -> throwE (e1 ++ ", " ++ e2)
@@ -169,7 +171,7 @@ module Lib2 (
     parseStringName :: Parser Name
     parseStringName = do
         input <- lift S.get
-        let str = takeWhile (/= ' ') input
+        let str = takeWhile (\c -> isAlphaNum c && c /= ' ') input
             rest = drop (length str) input
         if null str
             then throwE "not a string"
@@ -184,9 +186,9 @@ module Lib2 (
     parseMany :: Parser a -> Parser [a]
     parseMany parser = do
         input <- lift S.get
-        case runExceptT parser input of
-            Right (r, rest) -> do
-                lift (S.put rest)
+        result <- lift $ runExceptT parser
+        case result of
+            Right r -> do
                 rs <- parseMany parser
                 return (r : rs)
             Left _ -> return []
@@ -194,7 +196,7 @@ module Lib2 (
     -- Parse a single character
     -- <char> ::= "a" | "b" | "c" ...
     char :: Char -> Parser Char
-    char c = parseChar c
+    char = parseChar
 
     -- Parse a stop
     -- <stop> ::= "(" <stop_id> ")"
@@ -209,16 +211,20 @@ module Lib2 (
     -- Parse a route
     -- <route> ::= "<" <route_id> "{" <stop_list> <nested_route_list> "}" ">"
     parseRoute :: Parser Route
-    parseRoute = and7' makeRoute (char '<') name (char '{') parseStopList parseRouteList (char '}') (char '>')
-        where makeRoute _ routeId _ stops'' nestedRoutes _ _ = Route routeId stops'' nestedRoutes
+    parseRoute = do
+        char '<'
+        routeId <- parseName
+        char '{'
+        stops' <- parseStopList
+        nestedRoutes' <- parseRouteList
+        char '}'
+        char '>'
+        return $ Route routeId stops' nestedRoutes'
 
     -- Parse a list of routes
     -- <nested_route_list> ::= <route>*
     parseRouteList :: Parser [Route]
-    parseRouteList input =
-        case parseMany parseRoute input of
-            Right (routes', rest) -> Right (routes', rest)
-            Left _ -> Right ([], input)
+    parseRouteList = parseMany parseRoute
 
 
     -- Parse a route system
@@ -237,22 +243,22 @@ module Lib2 (
     -- Parse a list-create query
     -- <list_create> ::= "list-create " <name>
     parseListCreate :: Parser Query
-    parseListCreate = and2' (\_ listName -> ListCreate listName) (string "list-create ") name
+    parseListCreate = and2' (\_ listName -> ListCreate listName) (string "list-create ") parseName
 
     -- Parse a list-add query
     -- <list_add> ::= "list-add " <name> <route>
     parseListAdd :: Parser Query
-    parseListAdd = and4' (\_ listName _ routeName -> ListAdd listName routeName) (string "list-add ") name (char ' ') name
+    parseListAdd = and4' (\_ listName _ routeName -> ListAdd listName routeName) (string "list-add ") parseName (char ' ') parseName
 
     -- Parse a list-get query
     -- <list_get> ::= "list-get " <name>
     parseListGet :: Parser Query
-    parseListGet = and2' (\_ listName -> ListGet listName) (string "list-get ") name
+    parseListGet = and2' (\_ listName -> ListGet listName) (string "list-get ") parseName
 
     -- Parse a list-remove query
     -- <list_remove> ::= "list-remove " <name>
     parseListRemove :: Parser Query
-    parseListRemove = and2' (\_ listName -> ListRemove listName) (string "list-remove ") name
+    parseListRemove = and2' (\_ listName -> ListRemove listName) (string "list-remove ") parseName
 
     -- Parse a list-remove query
     -- <list_remove> ::= "list-remove " <name>
@@ -262,7 +268,7 @@ module Lib2 (
     -- Parse a route-get query
     -- <route_get> ::= "route-get " <name>
     parseRouteGet :: Parser Query
-    parseRouteGet = and2' (\_ routeId -> RouteGet routeId) (string "route-get ") name
+    parseRouteGet = and2' (\_ routeId -> RouteGet routeId) (string "route-get ") parseName
 
     -- Parse a route-add-route query
     -- <route_add_route> ::= "route-add-route " <route> <route>
@@ -270,44 +276,67 @@ module Lib2 (
     parseRouteAddRoute = and4'
         (\_ parentRoute _ childRoute -> RouteAddRoute parentRoute childRoute)
         (string "route-add-route ")
-        name
+        parseName
         (char ' ')
-        name
+        parseName
     -- Parse a route-remove query
     -- <route_remove> ::= "route-remove " <name>
     parseRouteRemove :: Parser Query
-    parseRouteRemove = and2' (\_ routeId -> RouteRemove routeId) (string "route-remove ") name
+    parseRouteRemove = and2' (\_ routeId -> RouteRemove routeId) (string "route-remove ") parseName
 
     -- Parse a stop-create query
     -- <stop_create> ::= "stop-create " <name>
     parseStopCreate :: Parser Query
-    parseStopCreate = and2' (\_ stopId -> StopCreate stopId) (string "stop-create ") name
+    parseStopCreate = and2' (\_ stopId -> StopCreate stopId) (string "stop-create ") parseName
 
     -- Parse a stop-delete query
     -- <stop_delete> ::= "stop-delete " <name>
     parseStopDelete :: Parser Query
-    parseStopDelete = and2' (\_ stopId -> StopDelete stopId) (string "stop-delete ") name
+    parseStopDelete = and2' (\_ stopId -> StopDelete stopId) (string "stop-delete ") parseName
 
     -- Parse a route-remove query
     -- <route_remove_stop> :: "route-remove-stop " <name> <stop>
     parseRouteRemoveStop :: Parser Query
-    parseRouteRemoveStop = and4' (\_ routeId _ stop -> RouteRemoveStop routeId stop) (string "route-remove-stop ") name (char ' ') name
+    parseRouteRemoveStop = and4' (\_ routeId _ stop -> RouteRemoveStop routeId stop) (string "route-remove-stop ") parseName (char ' ') parseName
 
     -- Parse a route-add query
     -- <route_add_stop> :: "route-add-stop " <name> <stop>
     parseRouteAddStop :: Parser Query
-    parseRouteAddStop = and4' (\_ routeId _ stop -> RouteAddStop routeId stop) (string "route-add-stop ") name (char ' ') name
+    parseRouteAddStop = and4' (\_ routeId _ stop -> RouteAddStop routeId stop) (string "route-add-stop ") parseName (char ' ') parseName
 
     parseRoutesFromStop :: Parser Query
-    parseRoutesFromStop = and2' (\_ stop -> RoutesFromStop stop) (string "routes-from-stop ") name
+    parseRoutesFromStop = and2' (\_ stop -> RoutesFromStop stop) (string "routes-from-stop ") parseName
 
     -- Main query parser
-    parseQuery :: Parser Query
-    parseQuery =
-        parseListAdd `or2` parseListCreate `or2` parseListGet `or2` parseListRemove `or2`
-        parseRouteCreate `or2` parseRouteGet `or2` parseRouteAddRoute `or2` parseRouteRemove `or2`
-        parseRouteAddStop `or2` parseRouteRemoveStop `or2` parseStopCreate `or2` parseStopDelete `or2` parseRoutesFromStop
-
+    parseQuery :: String -> Either String Query
+    parseQuery input = 
+        case S.runState (runExceptT parseListCreate) input of
+            (Right query, _) -> Right query
+            (Left err1, _) -> case S.runState (runExceptT parseListAdd) input of
+                (Right query, _) -> Right query
+                (Left err2, _) -> case S.runState (runExceptT parseListRemove) input of
+                    (Right query, _) -> Right query
+                    (Left err3, _) -> case S.runState (runExceptT parseListGet) input of
+                        (Right query, _) -> Right query
+                        (Left err4, _) -> case S.runState (runExceptT parseRouteCreate) input of
+                            (Right query, _) -> Right query
+                            (Left err5, _) -> case S.runState (runExceptT parseRouteGet) input of
+                                (Right query, _) -> Right query
+                                (Left err6, _) -> case S.runState (runExceptT parseRouteAddRoute) input of
+                                    (Right query, _) -> Right query
+                                    (Left err7, _) -> case S.runState (runExceptT parseRouteRemove) input of
+                                        (Right query, _) -> Right query
+                                        (Left err8, _) -> case S.runState (runExceptT parseStopCreate) input of
+                                            (Right query, _) -> Right query
+                                            (Left err9, _) -> case S.runState (runExceptT parseStopDelete) input of
+                                                (Right query, _) -> Right query
+                                                (Left err10, _) -> case S.runState (runExceptT parseRouteAddStop) input of
+                                                    (Right query, _) -> Right query
+                                                    (Left err11, _) -> case S.runState (runExceptT parseRouteRemoveStop) input of
+                                                        (Right query, _) -> Right query
+                                                        (Left err12, _) -> case S.runState (runExceptT parseRoutesFromStop) input of
+                                                            (Right query, _) -> Right query
+                                                            (Left err13, _) -> Left $ "Parse errors: " ++ err1 ++ ", " ++ err2 ++ ", " ++ err3 ++ ", " ++ err4 ++ ", " ++ err5 ++ ", " ++ err6 ++ ", " ++ err7 ++ ", " ++ err8 ++ ", " ++ err9 ++ ", " ++ err10 ++ ", " ++ err11 ++ ", " ++ err12 ++ ", " ++ err13
 
     -- Query definition.
     data Query

@@ -32,7 +32,7 @@ cmd :: String -> Repl ()
 cmd str = do
   case Lib2.parseQuery str of
     Left e -> liftIO $ putStrLn $ "PARSE ERROR:" ++ e
-    Right (query, _) -> do
+    Right query -> do
       st <- lift get
       case Lib2.stateTransition st query of
         Left e2 -> liftIO $ putStrLn $ e2

@@ -8,10 +8,11 @@ import qualified Lib2
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO, atomically, writeTVar)
 import Control.Concurrent (forkIO, newChan, Chan, readChan, writeChan)
 import Lib3 (storageOpLoop, stateTransition, StorageOp(..), parseCommand)
+import Data.Maybe (maybeToList)
 
 main :: IO ()
 main = do
-    state <- newTVarIO Lib2.emptyState
+    state <- newTVarIO Lib2.initialState
     chan <- newChan :: IO (Chan StorageOp)
     _ <- forkIO $ storageOpLoop chan
     scotty 3000 $ do
@@ -19,8 +20,10 @@ main = do
             b <- body
             liftIO $ putStrLn $ concat ["Request was: ", cs b]
             response <- liftIO $ handleRequest (cs b) state chan
+            currentState <- liftIO $ readTVarIO state
+            liftIO $ print currentState
             text $ cs response
-
+        
 handleRequest :: String -> TVar Lib2.State -> Chan StorageOp -> IO String
 handleRequest request state chan = do
     case Lib3.parseCommand request of
@@ -29,4 +32,4 @@ handleRequest request state chan = do
             result <- stateTransition state command chan
             case result of
                 Left err -> return $ "Error: " ++ err
-                Right messages -> return $ unlines messages
+                Right (maybeMsg, msg) -> return $ unlines $ maybeToList maybeMsg ++ [msg]

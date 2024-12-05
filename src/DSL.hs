@@ -12,9 +12,9 @@ import Control.Monad.Free (Free(..), liftF)
 --                   | Delete String next
 --                   deriving Functor
 
-data Command next = ListCreate String next
+data DomainAlgebra next = ListCreate String next
                     | ListAdd String String next
-                    | ListRemove String String next
+                    | ListRemove String next
                     | ListGet String (String -> next)
                     | RouteCreate String next
                     | RouteGet String (String -> next)
@@ -24,43 +24,52 @@ data Command next = ListCreate String next
                     | StopCreate String next
                     | StopDelete String next
                     | RoutesFromStop String (String -> next)
+                    | Save next
+                    | Load next
+                    deriving Functor
 
--- Define the Program type
-type Program = Free Command
+-- Define the Domain type
+type Domain = Free DomainAlgebra
 
 
-listCreate :: String -> Program ()
+listCreate :: String -> Domain ()
 listCreate name = liftF $ ListCreate name ()
 
-listAdd :: String -> String -> Program ()
+listAdd :: String -> String -> Domain ()
 listAdd ingName listName = liftF $ ListAdd ingName listName ()
 
-listRemove :: String -> String -> Program ()
-listRemove listName = liftF $ ListRemove listName ()
+listRemove :: String -> Domain ()
+listRemove name = liftF $ ListRemove name ()
 
-listGet :: String -> Program String
+listGet :: String -> Domain String
 listGet name = liftF $ ListGet name id
 
-routeCreate :: String -> Program ()
+routeCreate :: String -> Domain ()
 routeCreate name = liftF $ RouteCreate name ()
 
-routeGet :: String -> Program String
+routeGet :: String -> Domain String
 routeGet name = liftF $ RouteGet name id
 
-routeAddRoute :: String -> String -> Program ()
+routeAddRoute :: String -> String -> Domain ()
 routeAddRoute routeName stopName = liftF $ RouteAddRoute routeName stopName ()
 
-routeAddStop :: String -> String -> Program ()
+routeAddStop :: String -> String -> Domain ()
 routeAddStop routeName stopName = liftF $ RouteAddStop routeName stopName ()
 
-routeRemoveStop :: String -> String -> Program ()
+routeRemoveStop :: String -> String -> Domain ()
 routeRemoveStop routeName stopName = liftF $ RouteRemoveStop routeName stopName ()
 
-stopCreate :: String -> Program ()
+stopCreate :: String -> Domain ()
 stopCreate name = liftF $ StopCreate name ()
 
-stopDelete :: String -> Program ()
+stopDelete :: String -> Domain ()
 stopDelete name = liftF $ StopDelete name ()
 
-routesFromStop :: String -> Program String
+routesFromStop :: String -> Domain String
 routesFromStop name = liftF $ RoutesFromStop name id
+
+save :: Domain ()
+save = liftF $ Save ()
+
+load :: Domain ()
+load = liftF $ Load ()

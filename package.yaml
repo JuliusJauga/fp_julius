@@ -43,6 +43,7 @@ library:
   - QuickCheck
   - transformers
   - strict
+  - mtl
 
 executables:
   fp2024-one:
@@ -123,6 +124,8 @@ tests:
     - tasty-quickcheck
     - stm
     - QuickCheck
+    - mtl
+    - transformers
   fp2024-doctest:
     main:                Doctest.hs
     source-dirs:         doctest

@@ -9,29 +9,7 @@ import Control.Monad.State (StateT, get, modify)
 import Control.Monad.Except (ExceptT, throwError, runExceptT)
 import qualified DSL as DSL
 import qualified Network.Wreq as NetworkWreq
-
-
--- final :: Repl ExitDecision
--- final = do
---     liftIO $ putStrLn "Goodbye!"
---     return Exit
-
--- ini :: Repl ()
--- ini = liftIO $ putStrLn "Welcome! Press [TAB] to for auto completion."
-
--- completer :: (Monad m) => WordCompleter m
--- completer n =
---     return $ ":paste" : Prelude.filter (L.isPrefixOf n) Lib1.completions
-
--- cmd :: String -> Repl ()
--- cmd str = do
---     case Lib3.parseCommand str of
---         Left err -> liftIO $ "PARSE ERROR: " ++ err
---         Right (Lib3.LoadCommand, "") -> do
---             liftIO $ putStrLn "Loading..."
-            
-
-
+import qualified IMI as IMI
 
 
 interpretOneByOne :: DSL.Domain a -> IO a

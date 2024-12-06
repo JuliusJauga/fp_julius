@@ -1,8 +1,9 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE TypeApplications #-}
 import Test.Tasty ( TestTree, defaultMain, testGroup )
-import Test.Tasty.HUnit ( testCase, (@?=) )
+import Test.Tasty.HUnit ( testCase, (@?=), assertFailure, assertEqual )
 import Test.Tasty.QuickCheck as QC
+
 
 import Data.List
 import Data.Ord
@@ -15,12 +16,18 @@ import Test.QuickCheck (Arbitrary, arbitrary, elements, listOf1, Gen, resize, si
 import Control.Concurrent.STM (newTVarIO, readTVarIO, TVar)
 import Control.Concurrent (newChan, Chan)
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Except (runExceptT)
+import Control.Monad.Trans.State.Strict (execStateT)
+
+import IMI qualified
+import DSL qualified
+
 
 main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [propertyTests]
+tests = testGroup "Tests" [propertyTests, integrationTests]
 
 propertyTests :: TestTree
 propertyTests = testGroup "property tests"
@@ -70,36 +77,36 @@ maxLen = 10
 
 limListOf1 :: Gen a -> Gen [a]
 limListOf1 genElement = sized $ \n ->
-  let size = min n maxLen
-  in resize size (listOf1 genElement)
+    let size = min n maxLen
+    in resize size (listOf1 genElement)
 
 genStatements :: Gen Lib3.Statements
 genStatements = oneof [
-    Lib3.Single <$> genQuery,
-    Lib3.Batch <$> limListOf1 genQuery
-  ]
+        Lib3.Single <$> genQuery,
+        Lib3.Batch <$> limListOf1 genQuery
+    ]
 
 genQuery :: Gen Lib2.Query
 genQuery = oneof [
-    Lib2.ListCreate <$> genName,
-    Lib2.ListAdd <$> genName <*> genName,
-    Lib2.ListGet <$> genName,
-    Lib2.ListRemove <$> genName,
-    Lib2.RouteCreate <$> genRoute maxDepth,
-    Lib2.RouteGet <$> genName,
-    Lib2.RouteAddRoute <$> genName <*> genName,
-    Lib2.RouteAddStop <$> genName <*> genName,
-    Lib2.RouteRemoveStop <$> genName <*> genName,
-    Lib2.RouteRemove <$> genName,
-    Lib2.StopCreate <$> genName,
-    Lib2.StopDelete <$> genName,
-    Lib2.RoutesFromStop <$> genName
-  ]
+        Lib2.ListCreate <$> genName,
+        Lib2.ListAdd <$> genName <*> genName,
+        Lib2.ListGet <$> genName,
+        Lib2.ListRemove <$> genName,
+        Lib2.RouteCreate <$> genRoute maxDepth,
+        Lib2.RouteGet <$> genName,
+        Lib2.RouteAddRoute <$> genName <*> genName,
+        Lib2.RouteAddStop <$> genName <*> genName,
+        Lib2.RouteRemoveStop <$> genName <*> genName,
+        Lib2.RouteRemove <$> genName,
+        Lib2.StopCreate <$> genName,
+        Lib2.StopDelete <$> genName,
+        Lib2.RoutesFromStop <$> genName
+    ]
 
 genName :: Gen Lib2.Name
 genName = do
-  name <- limListOf1 $ elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']
-  return $ Lib2.StringName name
+    name <- limListOf1 $ elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']
+    return $ Lib2.StringName name
 
 genRoute :: Int -> Gen Lib2.Route
 genRoute 0 = Lib2.Route <$> genName <*> limListOf1 genStop <*> pure []
@@ -107,3 +114,93 @@ genRoute depth = Lib2.Route <$> genName <*> limListOf1 genStop <*> limListOf1 (g
 
 genStop :: Gen Lib2.Stop
 genStop = Lib2.Stop <$> genName
+
+-- Integration tests
+integrationTests :: TestTree
+integrationTests = testGroup "Integration tests"
+    [ testCase "Create list" $ do
+            let domain = DSL.listCreate "test"
+            result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
+            let expected = [("test", "")]
+            case result of
+                Left err -> assertFailure err
+                Right state -> state @?= expected
+    , testCase "Add to list" $ do
+            let domain = do
+                    DSL.listCreate "test"
+                    DSL.routeCreate "<item{}>"
+                    DSL.listAdd "item" "test"
+            result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
+            let expected = [("test", " item")]
+            case result of
+                Left err -> assertFailure err
+                Right state -> state @?= expected
+    , testCase "Create route" $ do
+            let domain = DSL.routeCreate "<test{}>"
+            result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
+            let expected = [("test", "")]
+            case result of
+                Left err -> assertFailure err
+                Right state -> state @?= expected
+    , testCase "Add route to route" $ do
+            let domain = do
+                    DSL.routeCreate "<parent{}>"
+                    DSL.routeCreate "<child{}>"
+                    DSL.routeAddRoute "parent" "child"
+            result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
+            let expected = [("parent", " child"), ("child", "")]
+            case result of
+                Left err -> assertFailure err
+                Right state -> state @?= expected
+    , testCase "Add stop to route" $ do
+            let domain = do
+                    DSL.routeCreate "<route{}>"
+                    DSL.stopCreate "stop"
+                    DSL.routeAddStop "route" "stop"
+            result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
+            let expected = [("route", " stop"), ("stop", "")]
+            case result of
+                Left err -> assertFailure err
+                Right state -> state @?= expected
+    , testCase "Remove stop from route" $ do
+            let domain = do
+                    DSL.routeCreate "<route{}>"
+                    DSL.stopCreate "stop"
+                    DSL.routeAddStop "route" "stop"
+                    DSL.routeRemoveStop "route" "stop"
+            result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
+            let expected = [("route", ""), ("stop", "")]
+            case result of
+                Left err -> assertFailure err
+                Right state -> state @?= expected
+    , testCase "Create stop" $ do   
+            let domain = DSL.stopCreate "test"
+            result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
+            let expected = [("test", "")]
+            case result of
+                Left err -> assertFailure err
+                Right state -> state @?= expected
+    , testCase "Delete stop" $ do   
+            let domain = do
+                    DSL.stopCreate "test"
+                    DSL.stopDelete "test"
+            result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
+            let expected = []
+            case result of
+                Left err -> assertFailure err
+                Right state -> state @?= expected            
+    , testCase "Save" $ do
+            let domain = DSL.save
+            result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
+            let expected = []
+            case result of
+                Left err -> assertFailure err
+                Right state -> state @?= expected
+    , testCase "Load" $ do
+            let domain = DSL.load
+            result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
+            let expected = []
+            case result of
+                Left err -> assertFailure err
+                Right state -> state @?= expected
+    ]

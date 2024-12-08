@@ -95,6 +95,29 @@ This executes a sequence of queries atomically using Software Transactional Memo
 
 Property tests have been added to test rendering and parsing statement batches (state marshalling). Arbitrary instance types have been added to be able to property test.
 
+
+## Lab4 comments.
+Implemented server-client communication simulation.
+
+Server receives a request from the client in plain text(commands). Server interprets them and executes the commands.
+
+## DSL
+Implemented for HTTP rendering requests from the client side to server.
+
+## Interpreters
+Three interpreters implemented for DSL.
+
+-- HTTP request per command
+
+-- HTTP request per batches
+
+-- In memory interpreter for integration testing
+
+## Interpreting
+
+While interpreting, if commands like stop-create / stop-delete are in the same batch they are not executed.
+If after cancelling out no commands are present anymore a post is not executed.
+
 ## BNF
 The grammar for this domain is provided in fp_julius/grammar.txt.
 

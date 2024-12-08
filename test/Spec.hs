@@ -128,48 +128,57 @@ integrationTests = testGroup "Integration tests"
     , testCase "Add to list" $ do
             let domain = do
                     DSL.listCreate "test"
-                    DSL.routeCreate "<item{}>"
-                    DSL.listAdd "item" "test"
+                    DSL.routeCreate "item"
+                    DSL.listAdd "test" "item"
             result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
-            let expected = [("test", " item")]
+            let expected = [("item",""),("test"," item")]
             case result of
                 Left err -> assertFailure err
                 Right state -> state @?= expected
     , testCase "Create route" $ do
-            let domain = DSL.routeCreate "<test{}>"
+            let domain = DSL.routeCreate "test"
             result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
             let expected = [("test", "")]
             case result of
                 Left err -> assertFailure err
                 Right state -> state @?= expected
+    , testCase "Remove route" $ do
+            let domain = do
+                    DSL.routeCreate "test"
+                    DSL.routeRemove "test"
+            result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
+            let expected = []
+            case result of
+                Left err -> assertFailure err
+                Right state -> state @?= expected
     , testCase "Add route to route" $ do
             let domain = do
-                    DSL.routeCreate "<parent{}>"
-                    DSL.routeCreate "<child{}>"
+                    DSL.routeCreate "parent"
+                    DSL.routeCreate "child"
                     DSL.routeAddRoute "parent" "child"
             result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
-            let expected = [("parent", " child"), ("child", "")]
+            let expected = [("child",""),("parent"," child")]
             case result of
                 Left err -> assertFailure err
                 Right state -> state @?= expected
     , testCase "Add stop to route" $ do
             let domain = do
-                    DSL.routeCreate "<route{}>"
+                    DSL.routeCreate "route"
                     DSL.stopCreate "stop"
                     DSL.routeAddStop "route" "stop"
             result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
-            let expected = [("route", " stop"), ("stop", "")]
+            let expected = [("stop",""),("route"," stop")]
             case result of
                 Left err -> assertFailure err
                 Right state -> state @?= expected
     , testCase "Remove stop from route" $ do
             let domain = do
-                    DSL.routeCreate "<route{}>"
+                    DSL.routeCreate "route"
                     DSL.stopCreate "stop"
                     DSL.routeAddStop "route" "stop"
                     DSL.routeRemoveStop "route" "stop"
             result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
-            let expected = [("route", ""), ("stop", "")]
+            let expected = [("stop",""),("route","")]
             case result of
                 Left err -> assertFailure err
                 Right state -> state @?= expected
@@ -189,18 +198,20 @@ integrationTests = testGroup "Integration tests"
             case result of
                 Left err -> assertFailure err
                 Right state -> state @?= expected            
-    , testCase "Save" $ do
-            let domain = DSL.save
-            result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
-            let expected = []
-            case result of
+    , testCase "Save and Load" $ do
+            let saveDomain = do
+                    DSL.listCreate "test"
+                    DSL.routeCreate "item"
+                    DSL.listAdd "test" "item"
+                    DSL.save
+            saveResult <- runExceptT $ execStateT (IMI.interpretInMemory saveDomain) []
+            case saveResult of
                 Left err -> assertFailure err
-                Right state -> state @?= expected
-    , testCase "Load" $ do
-            let domain = DSL.load
-            result <- runExceptT $ execStateT (IMI.interpretInMemory domain) []
-            let expected = []
-            case result of
-                Left err -> assertFailure err
-                Right state -> state @?= expected
+                Right _ -> do
+                    let loadDomain = DSL.load
+                    loadResult <- runExceptT $ execStateT (IMI.interpretInMemory loadDomain) []
+                    let expected = [("item",""),("test"," item")]
+                    case loadResult of
+                        Left err -> assertFailure err
+                        Right state -> state @?= expected
     ]

@@ -1,5 +1,4 @@
 BEGIN 
-stop-create stop1;
 route-create <route1{}>;
 list-create list1;
 END

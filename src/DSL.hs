@@ -17,6 +17,7 @@ data DomainAlgebra next = ListCreate String next
                     | ListRemove String next
                     | ListGet String (String -> next)
                     | RouteCreate String next
+                    | RouteRemove String next
                     | RouteGet String (String -> next)
                     | RouteAddRoute String String next
                     | RouteAddStop String String next
@@ -46,6 +47,9 @@ listGet name = liftF $ ListGet name id
 
 routeCreate :: String -> Domain ()
 routeCreate name = liftF $ RouteCreate name ()
+
+routeRemove :: String -> Domain ()
+routeRemove name = liftF $ RouteRemove name ()
 
 routeGet :: String -> Domain String
 routeGet name = liftF $ RouteGet name id

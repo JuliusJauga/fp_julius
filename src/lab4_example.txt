@@ -1,0 +1,59 @@
+SERVER
+
+Setting phasers to stun... (port 3000) (ctrl-c to quit)
+Request was: BEGIN
+route-create <route1{}>;
+list-create list1;
+END
+
+State {routeTreeLists = [(StringName "list1",[])], routes = [Route {routeId' = StringName "route1", stops' = [], nestedRoutes' = []}], stops = []}
+Request was: BEGIN
+route-add-stop route1 stop1;
+stop-create stop1;
+END
+
+State {routeTreeLists = [(StringName "list1",[])], routes = [Route {routeId' = StringName "route1", stops' = [], nestedRoutes' = []}], stops = []}
+Request was: save
+State {routeTreeLists = [(StringName "list1",[])], routes = [Route {routeId' = StringName "route1", stops' = [], nestedRoutes' = []}], stops = []}
+
+
+
+CLIENT
+
+Response {responseStatus = Status {statusCode = 200, statusMessage = "OK"}, responseVersion = HTTP/1.1, responseHeaders = [("Transfer-Encoding","chunked"),("Date","Sun, 08 Dec 2024 12:29:53 GMT"),("Server","Warp/3.3.25"),("Content-Type","text/plain; charset=utf-8")], responseBody = "Statements executed successfully.\nState {routeTreeLists = [(StringName \"list1\",[])], routes = [Route {routeId' = StringName \"route1\", stops' = [], nestedRoutes' = []}], stops = []}\n", responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
+  host                 = "localhost"
+  port                 = 3000
+  secure               = False
+  requestHeaders       = [("Content-Type","application/octet-stream"),("User-Agent","haskell wreq-0.5.4.2")]
+  path                 = "/"
+  queryString          = ""
+  method               = "POST"
+  proxy                = Nothing
+  rawBody              = False
+  redirectCount        = 10
+  responseTimeout      = ResponseTimeoutDefault
+  requestVersion       = HTTP/1.1
+  proxySecureMode      = ProxySecureWithConnect
+}
+}
+"Commands executed"
+Response {responseStatus = Status {statusCode = 200, statusMessage = "OK"}, responseVersion = HTTP/1.1, responseHeaders = [("Transfer-Encoding","chunked"),("Date","Sun, 08 Dec 2024 12:29:53 GMT"),("Server","Warp/3.3.25"),("Content-Type","text/plain; charset=utf-8")], responseBody = "Error: Error executing statements: Stop not found in the stops list.", responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
+  host                 = "localhost"
+  port                 = 3000
+  secure               = False
+  requestHeaders       = [("Content-Type","application/octet-stream"),("User-Agent","haskell wreq-0.5.4.2")]
+  path                 = "/"
+  queryString          = ""
+  method               = "POST"
+  proxy                = Nothing
+  rawBody              = False
+  redirectCount        = 10
+  responseTimeout      = ResponseTimeoutDefault
+  requestVersion       = HTTP/1.1
+  proxySecureMode      = ProxySecureWithConnect
+}
+}
+"Commands executed"
+"No commands to execute"
+Saving
+"Command executed"

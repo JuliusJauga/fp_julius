@@ -63,17 +63,23 @@ interpretOneByOne (Free (DSL.StopDelete name next)) = do
     interpretOneByOne next
 interpretOneByOne (Free (DSL.RoutesFromStop stopName f)) = do
     putStrLn $ "Getting routes from stop " ++ stopName
-    _ <- NetworkWreq.post "http://localhost:3000" (pack $ "routes-from-stop " ++ stopName)
+    response <- NetworkWreq.post "http://localhost:3000" (pack $ "routes-from-stop " ++ stopName)
+    let responseBody = response ^. NetworkWreq.responseBody
+    let routes = cs responseBody :: String
+    print routes
     interpretOneByOne (f "routes")
 
 interpretOneByOne (Free (DSL.Save next)) = do
     putStrLn "Saving"
     _ <- NetworkWreq.post "http://localhost:3000" (pack "save")
     interpretOneByOne next
-
 interpretOneByOne (Free (DSL.Load next)) = do
     putStrLn "Loading"
     _ <- NetworkWreq.post "http://localhost:3000" (pack "load")
+    interpretOneByOne next
+interpretOneByOne (Free (DSL.RouteRemove name next)) = do
+    putStrLn $ "Removing route " ++ name
+    _ <- NetworkWreq.post "http://localhost:3000" (pack $ "route-remove " ++ name)
     interpretOneByOne next
 
 interpretBatch :: DSL.Domain a -> IO String
@@ -88,7 +94,7 @@ interpretBatch program = do
             
 
 collectCommands :: DSL.Domain a -> [String]
-collectCommands = reverse . snd . foldCommands
+collectCommands = snd . foldCommands
 
 foldCommands :: DSL.Domain a -> ([String], [String])
 foldCommands (Pure _) = ([], [])
@@ -104,13 +110,13 @@ foldCommands (Free (DSL.ListRemove listName next)) =
 foldCommands (Free (DSL.RouteCreate name next)) =
     let (stack, cmds) = foldCommands next
     in if "route-remove " ++ name `elem` stack
-       then (filter (/= "route-remove " ++ name) stack, cmds) -- Cancel out with remove
+       then (filter (/= "route-remove " ++ name) stack, filter (/= "route-remove " ++ name ++ ";") cmds) -- Cancel out with remove
        else (("route-create " ++ name) : stack, ("route-create " ++ name ++ ";") : cmds)
 foldCommands (Free (DSL.RouteRemove name next)) =
     let (stack, cmds) = foldCommands next
     in if "route-create " ++ name `elem` stack
-       then (filter (/= "route-create " ++ name) stack, cmds) -- Cancel out with create
-       else (stack, cmds) -- Skip unmatched delete
+       then (filter (/= "route-create " ++ name) stack, filter (/= "route-create " ++ name ++ ";") cmds) -- Cancel out with create
+       else (("route-remove " ++ name) : stack, ("route-remove " ++ name ++ ";") : cmds)
 foldCommands (Free (DSL.StopCreate name next)) =
     let (stack, cmds) = foldCommands next
     in if "stop-delete " ++ name `elem` stack
@@ -139,6 +145,13 @@ foldCommands (Free (DSL.RouteRemoveStop routeName stopName next)) =
 foldCommands (Free (DSL.RoutesFromStop stopName f)) =
     let (stack, cmds) = foldCommands (f "routes")
     in (stack, ("routes-from-stop " ++ stopName ++ ";") : cmds)
+foldCommands (Free (DSL.ListGet name f)) =
+    let (stack, cmds) = foldCommands (f "list")
+    in (stack, ("list-get " ++ name ++ ";") : cmds)
+foldCommands (Free (DSL.RouteGet name f)) =
+    let (stack, cmds) = foldCommands (f "route")
+    in (stack, ("route-get " ++ name ++ ";") : cmds)
+
 
 
 interpretCommands :: DSL.Domain a -> IO String
@@ -154,25 +167,53 @@ interpretCommands domain = do
                 then return "No commands to execute"
                 else return "Commands executed"
 
-
 main :: IO ()
 main = do
     let program = do
             DSL.listCreate "list1"
             DSL.routeCreate "<route1{}>"
     result <- interpretCommands program
-    print result
+    putStrLn result
     let program = do
             DSL.stopCreate "stop1"
-            DSL.routeAddStop "route1" "stop1"
     result <- interpretCommands program
-    print result
+    putStrLn result
+    let program = do
+            DSL.routeCreate "<route2{}>"
+            DSL.routeCreate "<route3{}>"
+            DSL.routeCreate "<route4{}>"
+            DSL.routeAddStop "route4" "stop1"
+            DSL.routeAddRoute "route3" "route4"
+            DSL.routeAddRoute "route2" "route3"
+            DSL.routeAddRoute "route1" "route2"
+    result <- interpretCommands program
+    putStrLn result
+    let program = do
+            DSL.listAdd "list1" "route1"
+    result <- interpretCommands program
+    putStrLn result
+    let program = do
+            DSL.routesFromStop "stop1"
+    result <- interpretCommands program
+    putStrLn result
     let cancellingProgram = do
             DSL.stopCreate "stop2"
             DSL.stopDelete "stop2"
+            -- DSL.listRemove "list1"
+            -- DSL.routeRemove "route1"
+            -- DSL.stopDelete "stop1"
     result <- interpretCommands cancellingProgram
-    print result
+    putStrLn result
+    -- let program = do
+    --         DSL.routeRemoveStop "route1" "stop1"
+    -- result <- interpretCommands program
+    -- putStrLn result
+    -- let program = do
+    --         DSL.routeRemove "route1"
+    --         DSL.routeCreate "<route1{}>"
+    -- result <- interpretCommands program
+    -- putStrLn result
     let program = do
             DSL.save
     result <- interpretCommands program
-    print result
+    putStrLn result

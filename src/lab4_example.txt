@@ -1,26 +1,22 @@
-SERVER
-
+Registering library for fp2024-0.1.0.0..
 Setting phasers to stun... (port 3000) (ctrl-c to quit)
 Request was: BEGIN
-route-create <route1{}>;
 list-create list1;
+route-create <route1{}>;
 END
 
 State {routeTreeLists = [(StringName "list1",[])], routes = [Route {routeId' = StringName "route1", stops' = [], nestedRoutes' = []}], stops = []}
 Request was: BEGIN
-route-add-stop route1 stop1;
 stop-create stop1;
+route-add-stop route1 stop1;
 END
 
-State {routeTreeLists = [(StringName "list1",[])], routes = [Route {routeId' = StringName "route1", stops' = [], nestedRoutes' = []}], stops = []}
+State {routeTreeLists = [(StringName "list1",[])], routes = [Route {routeId' = StringName "route1", stops' = [Stop {stopId' = StringName "stop1"}], nestedRoutes' = []}], stops = [Stop {stopId' = StringName "stop1"}]}
 Request was: save
-State {routeTreeLists = [(StringName "list1",[])], routes = [Route {routeId' = StringName "route1", stops' = [], nestedRoutes' = []}], stops = []}
+State {routeTreeLists = [(StringName "list1",[])], routes = [Route {routeId' = StringName "route1", stops' = [Stop {stopId' = StringName "stop1"}], nestedRoutes' = []}], stops = [Stop {stopId' = StringName "stop1"}]}
 
 
-
-CLIENT
-
-Response {responseStatus = Status {statusCode = 200, statusMessage = "OK"}, responseVersion = HTTP/1.1, responseHeaders = [("Transfer-Encoding","chunked"),("Date","Sun, 08 Dec 2024 12:29:53 GMT"),("Server","Warp/3.3.25"),("Content-Type","text/plain; charset=utf-8")], responseBody = "Statements executed successfully.\nState {routeTreeLists = [(StringName \"list1\",[])], routes = [Route {routeId' = StringName \"route1\", stops' = [], nestedRoutes' = []}], stops = []}\n", responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
+Response {responseStatus = Status {statusCode = 200, statusMessage = "OK"}, responseVersion = HTTP/1.1, responseHeaders = [("Transfer-Encoding","chunked"),("Date","Tue, 10 Dec 2024 07:53:55 GMT"),("Server","Warp/3.3.25"),("Content-Type","text/plain; charset=utf-8")], responseBody = "Statements executed successfully.\nState {routeTreeLists = [(StringName \"list1\",[])], routes = [Route {routeId' = StringName \"route1\", stops' = [], nestedRoutes' = []}], stops = []}\n", responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
   host                 = "localhost"
   port                 = 3000
   secure               = False
@@ -37,7 +33,7 @@ Response {responseStatus = Status {statusCode = 200, statusMessage = "OK"}, resp
 }
 }
 "Commands executed"
-Response {responseStatus = Status {statusCode = 200, statusMessage = "OK"}, responseVersion = HTTP/1.1, responseHeaders = [("Transfer-Encoding","chunked"),("Date","Sun, 08 Dec 2024 12:29:53 GMT"),("Server","Warp/3.3.25"),("Content-Type","text/plain; charset=utf-8")], responseBody = "Error: Error executing statements: Stop not found in the stops list.", responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
+Response {responseStatus = Status {statusCode = 200, statusMessage = "OK"}, responseVersion = HTTP/1.1, responseHeaders = [("Transfer-Encoding","chunked"),("Date","Tue, 10 Dec 2024 07:53:55 GMT"),("Server","Warp/3.3.25"),("Content-Type","text/plain; charset=utf-8")], responseBody = "Statements executed successfully.\nState {routeTreeLists = [(StringName \"list1\",[])], routes = [Route {routeId' = StringName \"route1\", stops' = [Stop {stopId' = StringName \"stop1\"}], nestedRoutes' = []}], stops = [Stop {stopId' = StringName \"stop1\"}]}\n", responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
   host                 = "localhost"
   port                 = 3000
   secure               = False

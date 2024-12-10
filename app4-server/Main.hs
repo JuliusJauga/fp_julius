@@ -20,8 +20,8 @@ main = do
             b <- body
             liftIO $ putStrLn $ concat ["Request was: ", cs b]
             response <- liftIO $ handleRequest (cs b) state chan
-            currentState <- liftIO $ readTVarIO state
-            liftIO $ print currentState
+            -- currentState <- liftIO $ readTVarIO state
+            -- liftIO $ print currentState
             text $ cs response
         
 handleRequest :: String -> TVar Lib2.State -> Chan StorageOp -> IO String
@@ -31,5 +31,5 @@ handleRequest request state chan = do
         Right (command, _) -> do
             result <- stateTransition state command chan
             case result of
-                Left err -> return $ "Error: " ++ err
+                Left err -> return $ err
                 Right (maybeMsg, msg) -> return $ unlines $ maybeToList maybeMsg ++ [msg]

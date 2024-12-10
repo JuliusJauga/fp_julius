@@ -113,6 +113,36 @@ Three interpreters implemented for DSL.
 
 -- In memory interpreter for integration testing
 
+## Command folding for batches
+
+```
+foldCommands (ListCreate "l", StopCreate "s", RouteCreate "<r{}>")
+    |- (stack, cmds) = foldCommands (StopCreate "s", RouteCreate "<r{}>")
+        |- (stack, cmds) = foldCommands (RouteCreate "<r{}>")
+            |- (stack, cmds) = foldCommands (Pure ())
+                |- ([], [])
+            |- stack = ["route-create <r{}>"]
+            |- cmds = ["route-create <r{}>;"]
+        |- stack = ["stop-create s", "route-create <r{}>"]
+        |- cmds = ["stop-create s;", "route-create <r{}>;"]
+    |- stack = ["list-create l", "stop-create s", "route-create <r{}>"]
+    |- cmds = ["list-create l;", "stop-create s;", "route-create <r{}>;"]
+
+
+foldCommands (ListCreate "l", StopCreate "s", StopDelete "s")
+    |- (stack, cmds) = foldCommands (StopCreate "s", StopDelete "s")
+        |- (stack, cmds) = foldCommands (StopDelete "s")
+            |- (stack, cmds) = foldCommands (Pure ())
+                |- (stack, cmds) = ([], [])
+            |- stack = ["stop-delete s"]
+            |- cmds = ["stop-delete s;"]
+        |- stack = []
+        |- cmds = []
+    |- stack = ["list-create l"]
+    |- cmds = ["list-create l;"]
+```
+
+
 ## Interpreting
 
 While interpreting, if commands like stop-create / stop-delete are in the same batch they are not executed.

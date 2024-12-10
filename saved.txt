@@ -1,4 +1,6 @@
 BEGIN 
-route-create <route1{}>;
+stop-create stop1;
 list-create list1;
+route-create <route1{(stop1)<route2{(stop1)<route3{(stop1)<route4{(stop1)}>}>}>}>;
+list-add list1 route1;
 END
